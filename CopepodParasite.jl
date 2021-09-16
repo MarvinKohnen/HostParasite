@@ -6,13 +6,11 @@
 # only differentiate between phytoplancton and no phytoplancton, count biomass as patcehes where phytocplancton is found
 
 #Source of information for parameters: Maier1994
-
-#Hallo Marius 
-
 using Agents
 using Agents.Pathfinding
 using Random
 using FileIO
+
 #using Distributions
 #Normal(5,2) mu sigma
 #size= rand(Normal(5,2)n_copepod)
@@ -374,7 +372,7 @@ heightmap_url =
 model = initialize_model(heightmap_url)
 
 abm_video(
-    "CopepodGrazerParasite.mp4",
+    "Desktop/CopepodGrazerParasite.mp4",  ##!!!
     model,
     model_step!,
     phytoplancton_step!;
