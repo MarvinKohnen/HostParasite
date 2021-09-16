@@ -7,6 +7,8 @@
 
 #Source of information for parameters: Maier1994
 
+#Hallo Marius 
+
 using Agents
 using Agents.Pathfinding
 using Random
