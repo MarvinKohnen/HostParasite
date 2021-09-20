@@ -3,19 +3,15 @@
 # Incoming Parasites? New function? maybe hatch function or another reproduce 
 # Influence on infected Copepod behaviour apart from "moving more"
 # Statistics: add infected copepods somehow 
-# only differentiate between phytoplancton and no phytoplancton, count biomass as patcehes where phytocplancton is found
+
 
 #Source of information for parameters: Maier1994
+
 using Agents
 using Agents.Pathfinding
 using Random
 using FileIO
-
-#using Distributions
-#Normal(5,2) mu sigma
-#size= rand(Normal(5,2)n_copepod)
-#in for loop:
-# size[_]
+using Distributions
 
 
 #reproduction for loop 1:72.5
@@ -24,7 +20,7 @@ mutable struct CopepodGrazerParasite <: AbstractAgent
     pos::NTuple{3, Float64} #position in the Space
     type::Symbol # :Copepod or :Parasite or :Grazer 
     energy::Float64 
-    reproduction_prob::Float64  #Clutch size for Macrocyclops albidus: 72.0 
+    reproduction_prob::Float64  
     Δenergy::Float64
     infected::Bool
     age::Int  # 19.5 days for Macrocyclops albidus
@@ -69,11 +65,8 @@ function initialize_model(
     copepod_age = 0,
     grazer_age = 0,
     parasite_age = 0,
-    copepod_size = rand(7:10),
-    grazer_size = rand(4:6),
-    parasite_size = rand(1:3),
     regrowth_chance = 0.03, #regrowth chance of Phytoplankton in "steps"
-    dt = 0.1, #timestep for modle 
+    dt = 0.1, #timestep for model 
     seed = 23182,    
     )
     
@@ -91,7 +84,7 @@ function initialize_model(
     space = ContinuousSpace((100., 100., 50.); periodic = false)
     
     
-    phytoplancton = BitArray(           #?? 
+    phytoplancton = BitArray(            
         rand(rng, dims[1:2]...) .< (water_level .- heightmap)
     )
         
@@ -113,9 +106,15 @@ function initialize_model(
         copepod_age = copepod_age,
         grazer_age = grazer_age,
         parasite_age = parasite_age,
-        copepod_size = copepod_size,
-        grazer_size = grazer_size,
-        parasite_size = parasite_size,
+        copepod_size = (
+            if copepod.gender == 1 
+                rand(Normal(1.56, 0.097))
+            else 
+                rand(Normal(1.11, 0.093)) 
+            end
+        ),
+        grazer_size = 1,
+        parasite_size = 0.05,
         dt = dt,
         heightmap = heightmap,
         phytoplancton = phytoplancton,
@@ -189,18 +188,8 @@ function parasite_step!(parasite, model) #in lab: 2 days max (Parasites move rea
         kill_agent!(parasite, model, model.pathfinder)
         return
     end
-    host = [x for x in nearby_agents(parasite, model, model.parasite_vision) if x.type == :copepod]
-    if is_stationary(parasite, model.pathfinder)
-        if isempty(host)
-            set_target!(
-                parasite, 
-                random_walkable(parasite.pos, model, model.pathfinder, model.parasite_vision),
-                model.pathfinder,
-            )
-        else 
-            set_target!(parasite, rand(model.rng,map(x -> x.pos, host)), model.pathfinder)
-        end 
-        move_along_route!(parasite, model, model.pathfinder, model.parasite_speed, model.dt)
+    for _ in rand(5:24)
+        walk!(parasite, rand, model)
     end
 end
 
@@ -214,7 +203,7 @@ function grazer_step!(grazer, model)
     end
     
     if rand(model.rng) <= grazer.reproduction_prob
-        reproduce!(grazer, model)
+        grazer_reproduce!(grazer, model)
     end
         
     predators = [
@@ -253,7 +242,6 @@ function grazer_step!(grazer, model)
     grazer.age += 1
 end
  
-
 function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (parasties want to stay in that vicinity)
     food = [x for x in nearby_agents(copepod, model) if x.type == :grazer]
     infection = [x for x in nearby_agents(copepod, model) if x.type == :parasite] 
@@ -266,7 +254,7 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
     end
 
     if rand(model.rng) <= copepod.reproduction_prob 
-        reproduce!(copepod, model)
+        copepod_reproduce!(copepod, model)
     end
 
     if is_stationary(copepod, model.pathfinder)
@@ -305,24 +293,52 @@ end
 
 #Clutch size for Macrocyclops albidus: 72.0 
 # add time to grow up: mean time to maturity for Macrocyclops albidus: 19.5 days 
-function reproduce!(agent, model) 
-    if agent.type == :copepod && agent.infected == true 
-    elseif agent.gender == 1
-    agent.energy /= 2
-    id = nextid(model)
-    offspring = CopepodGrazerParasite(
-        id,
-        agent.pos,
-        agent.type,
-        agent.energy,
-        agent.reproduction_prob,
-        agent.Δenergy,
-        agent.infected,
-        0,
-        rand(1:2),
-        agent.size,
-    )
-    add_agent_pos!(offspring, model)
+function copepod_reproduce!(copepod, model) 
+    if copepod.type == :copepod && copepod.infected == true 
+    elseif copepod.gender == 1 && copepod.age > 19
+       
+        agent.energy /= 2
+
+        for _ in 1:(rand(Normal(72, 5)))
+            id = nextid(model)
+            offspring = CopepodGrazerParasite(
+                id,
+                copepod.pos,
+                copepod.type,
+                copepod.energy,
+                copepod.reproduction_prob,
+                copepod.Δenergy,
+                :false,
+                0,
+                rand(1:2),
+                copepod.size,
+            )
+        add_agent_pos!(offspring, model)
+        end
+    return
+    end
+end
+
+function grazer_reproduce!(grazer, model) 
+    if grazer.gender == 1
+       
+        grazer.energy /= 2
+        for _ in 1:(rand(Normal(72, 5)))
+            id = nextid(model)
+            offspring = CopepodGrazerParasite(
+                id,
+                grazer.pos,
+                grazer.type,
+                grazer.energy,
+                grazer.reproduction_prob,
+                grazer.Δenergy,
+                :false,
+                0,
+                rand(1:2),
+                grazer.size,
+            )
+        add_agent_pos!(offspring, model)
+        end
     return
     end
 end
@@ -372,7 +388,7 @@ heightmap_url =
 model = initialize_model(heightmap_url)
 
 abm_video(
-    "Desktop/CopepodGrazerParasite.mp4",  ##!!!
+    "CopepodGrazerParasite.mp4",
     model,
     model_step!,
     phytoplancton_step!;
