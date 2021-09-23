@@ -2,22 +2,23 @@
 # Infected copepods?
 # Incoming Parasites? New function? maybe hatch function or another reproduce 
 # Influence on infected Copepod behaviour apart from "moving more"
+#Line 127, || connection?
 # Statistics: add infected copepods somehow 
-
-
-#Source of information for parameters: Maier1994
+# only differentiate between phytoplankton and no phytoplankton, count biomass as patcehes where phytocplancton is found
+#
 
 using Agents
-using Agents.Pathfinding
 using Random
+using Agents.Pathfinding
 using FileIO
 using Distributions
+using InteractiveDynamics
+using CairoMakie
+using GLMakie
 
-
-#reproduction for loop 1:72.5
 mutable struct CopepodGrazerParasite <: AbstractAgent
     id::Int #Id of the Agent
-    pos::NTuple{3, Float64} #position in the Space
+    pos::NTuple{2, Int} #position in the Space
     type::Symbol # :Copepod or :Parasite or :Grazer 
     energy::Float64 
     reproduction_prob::Float64  
@@ -31,22 +32,19 @@ mutable struct CopepodGrazerParasite <: AbstractAgent
 end
 
 function Copepod(id, pos, energy, repr, Δe, age, size)
-CopepodGrazerParasite(id, pos, :copepod, energy, repr, Δe, :false, rand(1:2), age, size)
+    CopepodGrazerParasite(id, pos, :copepod, energy, repr, Δe, :false, rand(1:2), age, size)
 end
 
 function Parasite(id, pos, energy, repr, Δe, age, size)
     CopepodGrazerParasite(id, pos, :parasite, energy, repr, Δe,:false, 1, age, size)
 end
-
+    
 function Grazer(id, pos, energy, repr, Δe, age, size)
     CopepodGrazerParasite(id, pos, :grazer, energy, repr, Δe, :false, rand(1:2), age, size)
 end
-norm(vec) = √sum(vec .^ 2)
 
-function initialize_model(
-    heightmap_url,
-    ground_level= 0,
-    water_level = 35,  
+function initialize_model(;
+    dims(20,20),
     n_copepod = 100,
     n_grazer = 200, # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
     n_parasite = 100, #continuous stream of "newly introduced parasites": x amount of bird introduce each: 8000 eggs, only 20% hatch (Merle), check literature 
@@ -65,31 +63,22 @@ function initialize_model(
     copepod_age = 0,
     grazer_age = 0,
     parasite_age = 0,
+    copepod_size = 1,
+    grazer_size = 0.5,
+    parasite_size = 0.1,
     regrowth_chance = 0.03, #regrowth chance of Phytoplankton in "steps"
     dt = 0.1, #timestep for model 
     seed = 23182,    
     )
-    
-    heightmap = floor.(Int, convert.(Float64, load(download(heightmap_url))) * 39) .+ 1
-    dims = (size(heightmap)..., 50) #3 Dimensional space
-    water_walkmap = BitArray(falses(dims...))
-
-    for i in 1:dims[1], j in 1:dims[2]
-        if ground_level < heightmap[i,j] < water_level
-            water_walkmap[i, j, heightmap[i, j]+1] = true
-        end
-    end
 
     rng = MersenneTwister(seed) #MersenneTwister: pseudo random number generator
-    space = ContinuousSpace((100., 100., 50.); periodic = false)
-    
+    space = GridSpace(dims, periodic = false)
     
     phytoplancton = BitArray(            
-        rand(rng, dims[1:2]...) .< (water_level .- heightmap)
+        rand(rng, dims[1:2]...)
     )
-        
     properties = (
-        pathfinder = AStar(space; walkmap = water_walkmap),
+        pathfinder = AStar(space; walkmap, diagonal_movement = true),
         regrowth_chance = regrowth_chance,
         Δenergy_copepod = Δenergy_copepod,
         Δenergy_grazer = Δenergy_grazer,
@@ -106,23 +95,14 @@ function initialize_model(
         copepod_age = copepod_age,
         grazer_age = grazer_age,
         parasite_age = parasite_age,
-        copepod_size = (
-            if copepod.gender == 1 
-                rand(Normal(1.56, 0.097))
-            else 
-                rand(Normal(1.11, 0.093)) 
-            end
-        ),
-        grazer_size = 1,
-        parasite_size = 0.05,
+        copepod_size = copepod_size,
+        grazer_size = grazer_size,
+        parasite_size = parasite_size,
         dt = dt,
-        heightmap = heightmap,
         phytoplancton = phytoplancton,
-        water_level = water_level,
-        ground_level = ground_level,
     )
-
-    model = ABM(CopepodGrazerParasite, space; properties, rng)
+    
+    model = ABM(CopepodGrazerParasite, space; properties, rng, scheduler = Schedulers.randomly)
     
     for _ in 1:n_copepod
         add_agent_pos!(
@@ -351,14 +331,19 @@ function phytoplancton_step!(model)
     growable .= rand(model.rng, length(growable)) .< model.regrowth_chance * model.dt
 end 
 
+function offset(a)
+    a.type == :copepod ? (-0.7, -0.5) : (-0.3, -0.5)
+end
 
-
-using InteractiveDynamics
-using CairoMakie
-using GLMakie
-
-
-
+function ashape(a)
+    if a.type == :copepod 
+        :circle 
+    elseif a.type == :grazer
+        :utriangle
+    else
+        :hline
+    end
+end
 
 function acolor(a)
     if a.type == :copepod
@@ -372,30 +357,54 @@ function acolor(a)
     end
 end
 
-function static_preplot!(ax, model)
-    surface!(
-        ax,
-        (100/205):(100/205):100,
-        (100/205):(100/205):100,
-        model.heightmap;
-        colormap = :terrain
-    )
+phytoplanctoncolor(model) = model.regrowth_chance
+
+heatkwargs = (colormap = [:darkseagreen1, :darkgreen], colorrange = (0, 1))
+
+plotkwargs = (
+    ac = acolor,
+    as = 15,
+    am = ashape,
+    offset = offset,
+    heatarray = phytoplanctoncolor,
+    heatkwargs = heatkwargs,
+)
+
+fig, _ = abm_plot(model; plotkwargs...)
+fig
+
+grazer(a) = a.type == :grazer
+copepod(a) = a.type == :copepod
+parasite(a) = a.type == :parasite
+
+
+function plot_population_timeseries(adf, mdf)
+
+    figure = Figure(resolution = (600, 400))
+    ax = figure[1, 1] = Axis(figure; xlabel = "Step", ylabel = "Population")
+    grazer = lines!(ax, adf.step, adf.count_grazer, color = :yellow)
+    copepod = lines!(ax, adf.step, adf.count_copepod, color = :black)
+    parasite = lines!(ax, adf.step, adf.count_parasite, color = :red)
+    figure[1, 2] = Legend(figure, [grazer, copepod, parasite], ["Grazers", "Copepods", "Parasites"])
+    figure
 end
 
-heightmap_url =
-    "https://raw.githubusercontent.com/JuliaDynamics/" *
-    "JuliaDynamics/master/videos/agents/rabbit_fox_hawk_heightmap.png"
-model = initialize_model(heightmap_url)
+
+model = initialize_model()
+
+n = 500
+adata = [(grazer, count), (copepod, count), (parasite, count)]
+adf = run!(model, model_step!, phytoplancton_step!, n; adata)
+
+plot_population_timeseries(adf)
+
 
 abm_video(
-    "CopepodGrazerParasite.mp4",
+    "copepod.mp4",
     model,
-    model_step!,
+    model_step!, 
     phytoplancton_step!;
-    resolution = (700, 700),
-    frames = 300,
-    framerate = 20,
-    ac = acolor,
-    as = 1.0,
-    static_preplot!
+    frames = 150,
+    framerate = 8,
+    plotkwargs...,
 )
