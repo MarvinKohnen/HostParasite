@@ -18,7 +18,7 @@ using GLMakie
 
 mutable struct CopepodGrazerParasite <: AbstractAgent
     id::Int #Id of the Agent
-    pos::NTuple{2, Int} #position in the Space
+    pos::Dims{2} #position in the Space
     type::Symbol # :Copepod or :Parasite or :Grazer 
     energy::Float64 
     reproduction_prob::Float64  
@@ -44,7 +44,7 @@ function Grazer(id, pos, energy, repr, Δe, age, size)
 end
 
 function initialize_model(;
-    dims(20,20),
+    dims = (20,20),
     n_copepod = 100,
     n_grazer = 200, # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
     n_parasite = 100, #continuous stream of "newly introduced parasites": x amount of bird introduce each: 8000 eggs, only 20% hatch (Merle), check literature 
@@ -369,6 +369,7 @@ plotkwargs = (
     heatarray = phytoplanctoncolor,
     heatkwargs = heatkwargs,
 )
+model = initialize_model()
 
 fig, _ = abm_plot(model; plotkwargs...)
 fig
@@ -390,7 +391,6 @@ function plot_population_timeseries(adf, mdf)
 end
 
 
-model = initialize_model()
 
 n = 500
 adata = [(grazer, count), (copepod, count), (parasite, count)]

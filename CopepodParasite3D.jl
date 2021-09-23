@@ -1,9 +1,3 @@
-#TO DO:
-# Infected copepods?
-# Incoming Parasites? New function? maybe hatch function or another reproduce 
-# Influence on infected Copepod behaviour apart from "moving more"
-# Statistics: add infected copepods somehow 
-
 
 #Source of information for parameters: Maier1994
 
