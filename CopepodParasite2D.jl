@@ -1,10 +1,8 @@
 #TO DO:
 # Infected copepods?
 # Incoming Parasites? New function? maybe hatch function or another reproduce 
-# Influence on infected Copepod behaviour apart from "moving more"
-#Line 127, || connection?
 # Statistics: add infected copepods somehow 
-# only differentiate between phytoplankton and no phytoplankton, count biomass as patcehes where phytocplancton is found
+# only differentiate between phytoplancton and no phytoplancton, count biomass as patcehes where phytocplancton is found
 #
 
 using Agents
@@ -66,7 +64,7 @@ function initialize_model(;
     copepod_size = 1,
     grazer_size = 0.5,
     parasite_size = 0.1,
-    regrowth_chance = 0.03, #regrowth chance of Phytoplankton in "steps"
+    regrowth_time = 30, #regrowth time of Phytoplancton 
     dt = 0.1, #timestep for model 
     seed = 23182,    
     )
@@ -74,12 +72,11 @@ function initialize_model(;
     rng = MersenneTwister(seed) #MersenneTwister: pseudo random number generator
     space = GridSpace(dims, periodic = false)
     
-    phytoplancton = BitArray(            
-        rand(rng, dims[1:2]...)
-    )
     properties = (
-        pathfinder = AStar(space; walkmap, diagonal_movement = true),
-        regrowth_chance = regrowth_chance,
+        fully_grown = falses(dims),
+        countdown = zeros(Int, dims),
+        regrowth_time = regrowth_time,
+        pathfinder = AStar(space; diagonal_movement = true),
         Δenergy_copepod = Δenergy_copepod,
         Δenergy_grazer = Δenergy_grazer,
         Δenergy_parasite =Δenergy_parasite,
@@ -99,7 +96,6 @@ function initialize_model(;
         grazer_size = grazer_size,
         parasite_size = parasite_size,
         dt = dt,
-        phytoplancton = phytoplancton,
     )
     
     model = ABM(CopepodGrazerParasite, space; properties, rng, scheduler = Schedulers.randomly)
@@ -148,6 +144,14 @@ function initialize_model(;
             model,
         )
     end
+    
+    for p in positions(model) # random grass initial growth
+        fully_grown = rand(model.rng, Bool)
+        countdown = fully_grown ? regrowth_time : rand(model.rng, 1:regrowth_time) - 1
+        model.countdown[p...] = countdown
+        model.fully_grown[p...] = fully_grown
+    end
+
     return model
 end
 
@@ -265,9 +269,9 @@ function copepod_eat!(copepod, food, infection, model) #copepod eat around their
 end
 
 function grazer_eat!(grazer, model)        
-    if get_spatial_property(grazer.pos, model.phytoplancton, model) == 1
-        model.phytoplancton[get_spatial_index(grazer.pos, model.phytoplancton, model)]=0
+    if model.fully_grown[grazer.pos...]
         grazer.energy += grazer.Δenergy
+        model.fully_grown[grazer.pos...] = false
     end
 end
 
@@ -323,13 +327,18 @@ function grazer_reproduce!(grazer, model)
     end
 end
 
-function phytoplancton_step!(model)  
-    growable = view(
-        model.phytocplancton,
-        model.phytocplancton .== 0 .& model.ground_level .< model.heightmap .< model.water_level,
-    )
-    growable .= rand(model.rng, length(growable)) .< model.regrowth_chance * model.dt
-end 
+function phytoplancton_step!(model)
+    @inbounds for p in positions(model) # we don't have to enable bound checking
+        if !(model.fully_grown[p...])
+            if model.countdown[p...] ≤ 0
+                model.fully_grown[p...] = true
+                model.countdown[p...] = model.regrowth_time
+            else
+                model.countdown[p...] -= 1
+            end
+        end
+    end
+end
 
 function offset(a)
     a.type == :copepod ? (-0.7, -0.5) : (-0.3, -0.5)
@@ -357,7 +366,7 @@ function acolor(a)
     end
 end
 
-phytoplanctoncolor(model) = model.regrowth_chance
+phytoplanctoncolor(model) = model.regrowth_time
 
 heatkwargs = (colormap = [:darkseagreen1, :darkgreen], colorrange = (0, 1))
 
