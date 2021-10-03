@@ -196,7 +196,7 @@ function grazer_step!(grazer, model)
     ]
 
     if !isempty(predators) && is_stationary(grazer, model.pathfinder)
-        direction = (0. , 0., 0.)
+        direction = (0, 0)
         for predator in predators 
             away_direction = (grazer.pos .- predators) #direction away from predators
             all(away_direction .≈ 0.) && continue  #predator at our location -> move anywhere
@@ -366,13 +366,13 @@ function acolor(a)
     end
 end
 
-phytoplanctoncolor(model) = model.regrowth_time
+phytoplanctoncolor(model) = model.countdown ./ model.regrowth_time
 
 heatkwargs = (colormap = [:darkseagreen1, :darkgreen], colorrange = (0, 1))
 
 plotkwargs = (
     ac = acolor,
-    as = 15,
+    as = 10,
     am = ashape,
     offset = offset,
     heatarray = phytoplanctoncolor,
@@ -386,30 +386,31 @@ fig
 grazer(a) = a.type == :grazer
 copepod(a) = a.type == :copepod
 parasite(a) = a.type == :parasite
+count_phytoplancton(model) = count(model.fully_grown)
 
+n = 100
+adata = [(grazer, count), (copepod, count), (parasite, count)]
+mdata = [count_phytoplancton]
+adf, mdf = run!(model, model_step!, phytoplancton_step!, n; adata, mdata)
 
 function plot_population_timeseries(adf, mdf)
-
     figure = Figure(resolution = (600, 400))
     ax = figure[1, 1] = Axis(figure; xlabel = "Step", ylabel = "Population")
-    grazer = lines!(ax, adf.step, adf.count_grazer, color = :yellow)
-    copepod = lines!(ax, adf.step, adf.count_copepod, color = :black)
-    parasite = lines!(ax, adf.step, adf.count_parasite, color = :red)
-    figure[1, 2] = Legend(figure, [grazer, copepod, parasite], ["Grazers", "Copepods", "Parasites"])
+    grazerl = lines!(ax, adf.step, adf.count_grazer, color = :yellow)
+    copepodl = lines!(ax, adf.step, adf.count_copepod, color = :black)
+    parasitel = lines!(ax, adf.step, adf.count_parasite, color = :magenta)
+    phytoplanctonl = lines!(ax,mdf.step, mdf.count_phytoplancton, color = :green)
+    figure[1, 2] = Legend(figure, [grazerl, copepodl, parasitel, phytoplanctonl], ["Grazers", "Copepods", "Parasites", "Phytoplancton biomass"])
     figure
 end
 
 
 
-n = 500
-adata = [(grazer, count), (copepod, count), (parasite, count)]
-adf = run!(model, model_step!, phytoplancton_step!, n; adata)
-
-plot_population_timeseries(adf)
+plot_population_timeseries(adf,mdf)
 
 
 abm_video(
-    "copepod.mp4",
+    "copepodparasite.mp4",
     model,
     model_step!, 
     phytoplancton_step!;
