@@ -45,7 +45,7 @@ function initialize_model(;
     dims = (20,20),
     n_copepod = 100,
     n_grazer = 200, # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
-    n_parasite = 100, #continuous stream of "newly introduced parasites": x amount of bird introduce each: 8000 eggs, only 20% hatch (Merle), check literature 
+    n_parasite = 1600, #continuous stream of "newly introduced parasites": x amount of bird introduce each: 8000 eggs, only 20% hatch (Merle), check literature 
     Δenergy_copepod = 20, #??? 
     Δenergy_grazer = 20, #??? 
     Δenergy_parasite = 10,#???   
@@ -223,7 +223,6 @@ function grazer_step!(grazer, model)
         )
     end
     move_along_route!(grazer, model, model.pathfinder, model.grazer_speed, model.dt)
-    grazer.age += 1
 end
  
 function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (parasties want to stay in that vicinity)
@@ -281,7 +280,7 @@ function copepod_reproduce!(copepod, model)
     if copepod.type == :copepod && copepod.infected == true 
     elseif copepod.gender == 1 && copepod.age > 19
        
-        agent.energy /= 2
+        copepod.energy /= 2
 
         for _ in 1:(rand(Normal(72, 5)))
             id = nextid(model)
@@ -304,7 +303,7 @@ function copepod_reproduce!(copepod, model)
 end
 
 function grazer_reproduce!(grazer, model) 
-    if grazer.gender == 1
+    if grazer.gender == 1 && grazer.age > 10
        
         grazer.energy /= 2
         for _ in 1:(rand(Normal(72, 5)))
@@ -404,10 +403,7 @@ function plot_population_timeseries(adf, mdf)
     figure
 end
 
-
-
 plot_population_timeseries(adf,mdf)
-
 
 abm_video(
     "copepodparasite.mp4",
