@@ -1,12 +1,9 @@
-#TO DO:
-# Infected copepods?
-# Incoming Parasites? New function? maybe hatch function or another reproduce 
-# Statistics: add infected copepods somehow 
-# only differentiate between phytoplancton and no phytoplancton, count biomass as patcehes where phytocplancton is found
-#
+#Add incoming parasites?
+#Phytoplankton as their own mutable struct -> Union command 
+#Energy transmission 
 
-using Agents
 using Random
+using Agents
 using Agents.Pathfinding
 using FileIO
 using Distributions
@@ -14,10 +11,10 @@ using InteractiveDynamics
 using CairoMakie
 using GLMakie
 
-mutable struct CopepodGrazerParasite <: AbstractAgent
+mutable struct CopepodGrazerParasitePhytoplankton <: AbstractAgent
     id::Int #Id of the Agent
     pos::Dims{2} #position in the Space
-    type::Symbol # :Copepod or :Parasite or :Grazer 
+    type::Symbol # :Copepod or :Parasite or :Grazer or :Phytoplankton
     energy::Float64 
     reproduction_prob::Float64  
     Δenergy::Float64
@@ -30,31 +27,33 @@ mutable struct CopepodGrazerParasite <: AbstractAgent
 end
 
 function Copepod(id, pos, energy, repr, Δe, age, size)
-    CopepodGrazerParasite(id, pos, :copepod, energy, repr, Δe, :false, rand(1:2), age, size)
+    CopepodGrazerParasitePhytoplankton(id, pos, :copepod, energy, repr, Δe, :false, age, rand(1:2), size)
 end
 
 function Parasite(id, pos, energy, repr, Δe, age, size)
-    CopepodGrazerParasite(id, pos, :parasite, energy, repr, Δe,:false, 1, age, size)
+    CopepodGrazerParasitePhytoplankton(id, pos, :parasite, energy, repr, Δe,:false, age, 1, size)
 end
     
 function Grazer(id, pos, energy, repr, Δe, age, size)
-    CopepodGrazerParasite(id, pos, :grazer, energy, repr, Δe, :false, rand(1:2), age, size)
+    CopepodGrazerParasitePhytoplankton(id, pos, :grazer, energy, repr, Δe, :false, age, rand(1:2), size)
 end
+
+function Phytoplankton(id, pos, energy, age)
+    CopepodGrazerParasitePhytoplankton(id, pos, :phytoplankton, energy, 0.0, 10, :false, age, 1, 0.01)
+end 
 
 function initialize_model(;
     dims = (20,20),
     n_copepod = 100,
+    n_phytoplankton = 900,
     n_grazer = 200, # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
-    n_parasite = 1600, #continuous stream of "newly introduced parasites": x amount of bird introduce each: 8000 eggs, only 20% hatch (Merle), check literature 
+    n_parasite = 100, #continuous stream of "newly introduced parasites": x amount of bird introduce each: 8000 eggs, only 20% hatch (Merle), check literature 
     Δenergy_copepod = 20, #??? 
     Δenergy_grazer = 20, #??? 
     Δenergy_parasite = 10,#???   
     copepod_vision = 2,  # how far copepods can see grazer to hunt
-    grazer_vision = 1,  # how far grazer see phytoplancton to feed on
+    grazer_vision = 1,  # how far grazer see phytoplankton to feed on
     parasite_vision = 2,  # how far parasites can see copepods to stay in their general vicinity
-    copepod_speed = 1.2,
-    parasite_speed = 1.3,
-    grazer_speed = 1.0,
     copepod_reproduce = 0.05, #changes if infected, see copepod_reproduce function
     grazer_reproduce = 0.05, #are not infected -> steady reproduction rate
     parasite_reproduce = 0, 
@@ -64,8 +63,8 @@ function initialize_model(;
     copepod_size = 1,
     grazer_size = 0.5,
     parasite_size = 0.1,
-    regrowth_time = 30, #regrowth time of Phytoplancton 
-    dt = 0.1, #timestep for model 
+    phytoplankton_age =0,
+    phytoplankton_energy = 0,
     seed = 23182,    
     )
 
@@ -73,9 +72,6 @@ function initialize_model(;
     space = GridSpace(dims, periodic = false)
     
     properties = (
-        fully_grown = falses(dims),
-        countdown = zeros(Int, dims),
-        regrowth_time = regrowth_time,
         pathfinder = AStar(space; diagonal_movement = true),
         Δenergy_copepod = Δenergy_copepod,
         Δenergy_grazer = Δenergy_grazer,
@@ -83,9 +79,6 @@ function initialize_model(;
         copepod_vision = copepod_vision,
         grazer_vision = grazer_vision,
         parasite_vision = parasite_vision,
-        copepod_speed = copepod_speed,
-        parasite_speed = parasite_speed,
-        grazer_speed = grazer_speed,
         copepod_reproduce = copepod_reproduce,
         grazer_reproduce = grazer_reproduce,
         parasite_reproduce = parasite_reproduce, 
@@ -95,10 +88,11 @@ function initialize_model(;
         copepod_size = copepod_size,
         grazer_size = grazer_size,
         parasite_size = parasite_size,
-        dt = dt,
+        phytoplankton_age = phytoplankton_age,
+        phytoplankton_energy = phytoplankton_energy
     )
     
-    model = ABM(CopepodGrazerParasite, space; properties, rng, scheduler = Schedulers.randomly)
+    model = ABM(CopepodGrazerParasitePhytoplankton, space; properties, rng, scheduler = Schedulers.randomly)
     
     for _ in 1:n_copepod
         add_agent_pos!(
@@ -145,29 +139,35 @@ function initialize_model(;
         )
     end
     
-    for p in positions(model) # random grass initial growth
-        fully_grown = rand(model.rng, Bool)
-        countdown = fully_grown ? regrowth_time : rand(model.rng, 1:regrowth_time) - 1
-        model.countdown[p...] = countdown
-        model.fully_grown[p...] = fully_grown
+    for _ in 1:n_phytoplankton
+        add_agent_pos!(
+            Phytoplankton(
+                nextid(model),
+                random_position(model),
+                0,
+                rand(1:10),
+            ),
+            model,
+        )
     end
-
     return model
 end
 
 
-function model_step!(agent::CopepodGrazerParasite, model)
+function model_step!(agent::CopepodGrazerParasitePhytoplankton, model)
     if agent.type == :copepod
         copepod_step!(agent, model)
     elseif agent.type == :grazer 
         grazer_step!(agent, model)
-    else 
+    elseif agent.type == :parasite
         parasite_step!(agent, model)
+    else 
+        phytoplankton_step!(agent, model)
     end
 end
 
 function parasite_step!(parasite, model) #in lab: 2 days max (Parasites move really quickly, maybe even follow copepods), copepod 4 days max without food 
-    parasite.energy -= model.dt     
+    parasite.energy -= 1
     if parasite.energy < 0
         kill_agent!(parasite, model, model.pathfinder)
         return
@@ -178,9 +178,11 @@ function parasite_step!(parasite, model) #in lab: 2 days max (Parasites move rea
 end
 
 function grazer_step!(grazer, model) 
-    grazer_eat!(grazer, model)
+    agents = collect(agents_in_position(grazer.pos, model))   #[x for x in nearby_agents(grazer, model, grazer_vision) if x.type == :phytoplankton]
+    plankton = filter!(x -> x.type == :phytoplankton, agents)
+    grazer_eat!(grazer, plankton, model)
     grazer.age += 1
-    grazer.energy -= model.dt 
+    grazer.energy -= 1
     if grazer.energy < 0
         kill_agent!(grazer, model,model.pathfinder)
         return
@@ -204,7 +206,7 @@ function grazer_step!(grazer, model)
         end
         if all(direction .≈ 0.)
             #move anywhere
-            chosen_position = random_walkable(grazer.pos, model, model.pathfinder, model.grazer_vision)
+            chosen_position = random_walkable(model, model.pathfinder)
         else
             #Normalize the resultant direction and get the ideal position to move it
             direction = direction ./norm(direction)
@@ -222,15 +224,18 @@ function grazer_step!(grazer, model)
             model.pathfinder
         )
     end
-    move_along_route!(grazer, model, model.pathfinder, model.grazer_speed, model.dt)
+    move_along_route!(grazer, model, model.pathfinder)  
 end
  
 function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (parasties want to stay in that vicinity)
-    food = [x for x in nearby_agents(copepod, model) if x.type == :grazer]
-    infection = [x for x in nearby_agents(copepod, model) if x.type == :parasite] 
+    #food = [x for x in nearby_agents(copepod, model, copepod_vision) if x.type == :grazer]
+    #infection = [x for x in nearby_agents(copepod, model, copepod_vision) if x.type == :parasite] 
+    agents = collect(agents_in_position(copepod.pos, model))
+    food = filter!(x -> x.type == :grazer, agents)
+    infection = filter!(x -> x.type == :parasite, agents)
     copepod_eat!(copepod, food, infection, model)  
     copepod.age += 1
-    copepod.energy -= model.dt
+    copepod.energy -= 1
     if copepod.energy < 0
         kill_agent!(copepod, model, model.pathfinder)
         return
@@ -241,19 +246,25 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
     end
 
     if is_stationary(copepod, model.pathfinder)
-        prey = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :grazer]
+        prey = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :grazer && x.age >= 10]
         if isempty(prey)
             #move anywhere if no prey nearby
             set_target!(
                 copepod,
-                random_walkable(copepod.pos, model, model.pathfinder, model.copepod_vision),
+                random_walkable(model, model.pathfinder),
                 model.pathfinder
             )
             return
         end
         set_target!(copepod, rand(model.rng, map(x -> x.pos, prey)), model.pathfinder)
     end
-    move_along_route!(copepod, model, model.pathfinder, model.copepod_speed, model.dt)
+    move_along_route!(copepod, model, model.pathfinder)
+    if copepod.infected == true
+        copepod_eat!(copepod, food, infection, model)
+        copepod.energy -= 1
+        move_along_route!(copepod, model, model.pathfinder)
+    end
+
 end
 
 function copepod_eat!(copepod, food, infection, model) #copepod eat around their general vicinity
@@ -267,10 +278,10 @@ function copepod_eat!(copepod, food, infection, model) #copepod eat around their
     end
 end
 
-function grazer_eat!(grazer, model)        
-    if model.fully_grown[grazer.pos...]
+function grazer_eat!(grazer, plankton, model)        
+    if !isempty(plankton)
         grazer.energy += grazer.Δenergy
-        model.fully_grown[grazer.pos...] = false
+        kill_agent!(rand(model.rng, plankton), model)
     end
 end
 
@@ -284,7 +295,7 @@ function copepod_reproduce!(copepod, model)
 
         for _ in 1:(rand(Normal(72, 5)))
             id = nextid(model)
-            offspring = CopepodGrazerParasite(
+            offspring = CopepodGrazerParasitePhytoplankton(
                 id,
                 copepod.pos,
                 copepod.type,
@@ -308,7 +319,7 @@ function grazer_reproduce!(grazer, model)
         grazer.energy /= 2
         for _ in 1:(rand(Normal(72, 5)))
             id = nextid(model)
-            offspring = CopepodGrazerParasite(
+            offspring = CopepodGrazerParasitePhytoplankton(
                 id,
                 grazer.pos,
                 grazer.type,
@@ -326,18 +337,28 @@ function grazer_reproduce!(grazer, model)
     end
 end
 
-function phytoplancton_step!(model)
-    @inbounds for p in positions(model) # we don't have to enable bound checking
-        if !(model.fully_grown[p...])
-            if model.countdown[p...] ≤ 0
-                model.fully_grown[p...] = true
-                model.countdown[p...] = model.regrowth_time
-            else
-                model.countdown[p...] -= 1
-            end
-        end
+function phytoplankton_reproduce!(phytoplankton, model) 
+    if phytoplankton.age >= 10
+        phytoplankton.energy /= 2
+
+        id = nextid(model)
+        offspring = Phytoplankton(
+            id,
+            phytoplankton.pos,
+            0,
+            0,
+        )
+    add_agent_pos!(offspring, model)
+    return
     end
 end
+
+function phytoplankton_step!(phytoplankton, model)
+    phytoplankton.age += 1
+    phytoplankton.energy += 1
+    phytoplankton_reproduce!(phytoplankton, model)
+end
+
 
 function offset(a)
     a.type == :copepod ? (-0.7, -0.5) : (-0.3, -0.5)
@@ -348,8 +369,10 @@ function ashape(a)
         :circle 
     elseif a.type == :grazer
         :utriangle
-    else
+    elseif a.type == :parasite
         :hline
+    else 
+        :square
     end
 end
 
@@ -360,22 +383,18 @@ function acolor(a)
         :red
     elseif a.type == :grazer 
         :yellow
-    else
+    elseif a.type == :parasite
         :magenta
+    else 
+        :green
     end
 end
-
-phytoplanctoncolor(model) = model.countdown ./ model.regrowth_time
-
-heatkwargs = (colormap = [:darkseagreen1, :darkgreen], colorrange = (0, 1))
 
 plotkwargs = (
     ac = acolor,
     as = 10,
     am = ashape,
     offset = offset,
-    heatarray = phytoplanctoncolor,
-    heatkwargs = heatkwargs,
 )
 model = initialize_model()
 
@@ -385,21 +404,21 @@ fig
 grazer(a) = a.type == :grazer
 copepod(a) = a.type == :copepod
 parasite(a) = a.type == :parasite
-count_phytoplancton(model) = count(model.fully_grown)
+#count_phytoplankton(model) = count(model.phytoplankton)
 
 n = 100
 adata = [(grazer, count), (copepod, count), (parasite, count)]
-mdata = [count_phytoplancton]
-adf, mdf = run!(model, model_step!, phytoplancton_step!, n; adata, mdata)
+#mdata = [count_phytoplankton]
+adf = run!(model, model_step!, phytoplankton_step!, n; adata)
 
-function plot_population_timeseries(adf, mdf)
+function plot_population_timeseries(adf)
     figure = Figure(resolution = (600, 400))
     ax = figure[1, 1] = Axis(figure; xlabel = "Step", ylabel = "Population")
     grazerl = lines!(ax, adf.step, adf.count_grazer, color = :yellow)
     copepodl = lines!(ax, adf.step, adf.count_copepod, color = :black)
     parasitel = lines!(ax, adf.step, adf.count_parasite, color = :magenta)
-    phytoplanctonl = lines!(ax,mdf.step, mdf.count_phytoplancton, color = :green)
-    figure[1, 2] = Legend(figure, [grazerl, copepodl, parasitel, phytoplanctonl], ["Grazers", "Copepods", "Parasites", "Phytoplancton biomass"])
+    #phytoplanktonl = lines!(ax,mdf.step, mdf.count_phytoplankton, color = :green)
+    figure[1, 2] = Legend(figure, [grazerl, copepodl, parasitel], ["Grazers", "Copepods", "Parasites"])
     figure
 end
 
@@ -409,7 +428,7 @@ abm_video(
     "copepodparasite.mp4",
     model,
     model_step!, 
-    phytoplancton_step!;
+    phytoplankton_step!
     frames = 150,
     framerate = 8,
     plotkwargs...,
