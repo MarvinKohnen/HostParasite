@@ -42,6 +42,8 @@ function Phytoplankton(id, pos, energy, age)
     CopepodGrazerParasitePhytoplankton(id, pos, :phytoplankton, energy, 0.0, 10, :false, age, 1, 0.01)
 end 
 
+norm(vec) = √sum(vec .^ 2)
+
 function initialize_model(;
     dims = (20,20),
     n_copepod = 100,
@@ -199,10 +201,17 @@ function grazer_step!(grazer, model)
 
     if !isempty(predators) && is_stationary(grazer, model.pathfinder)
         direction = (0, 0)
-        for predator in predators 
-            away_direction = (grazer.pos .- predators) #direction away from predators
+        away_direction = []
+        for i in 1: length(predators)
+            if i == 1
+                away_direction = (grazer.pos .- predators[i]) 
+            else    
+                away_direction = away_direction .- predators[i]
+            end
+            
+            #direction away from predators
             all(away_direction .≈ 0.) && continue  #predator at our location -> move anywhere
-            direction = direction .+ away_direction ./norm_(away_direction) ^2  #set new direction, closer predators contribute more to direction 
+            direction = direction .+ away_direction ./norm(away_direction) ^2  #set new direction, closer predators contribute more to direction 
         end
         if all(direction .≈ 0.)
             #move anywhere
@@ -212,7 +221,7 @@ function grazer_step!(grazer, model)
             direction = direction ./norm(direction)
             #move to a random position in the general direction of away from predators
             position = grazer.pos .+ direction .* (model.grazer_vision/ 2.)
-            chosen_position = random.walkable(position, model, model.pathfinder, model.grazer_vision /2.)
+            chosen_position = random_walkable(model, model.pathfinder)
         end
         set_target!(grazer, chosen_position, model.pathfinder)
     end 
@@ -220,7 +229,7 @@ function grazer_step!(grazer, model)
     if is_stationary(grazer, model.pathfinder)
         set_target!(
             grazer,
-            random_walkable(grazer.pos, model, model.pathfinder, model.grazer_vision),
+            random_walkable(model, model.pathfinder),
             model.pathfinder
         )
     end
@@ -353,8 +362,12 @@ function phytoplankton_reproduce!(phytoplankton, model)
     end
 end
 
+
 function phytoplankton_step!(phytoplankton, model)
     phytoplankton.age += 1
+    if phytoplankton.age >= 20
+        kill_agent!(rand(model.rng, phytoplankton), model)
+    end
     phytoplankton.energy += 1
     phytoplankton_reproduce!(phytoplankton, model)
 end
