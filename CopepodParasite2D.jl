@@ -47,9 +47,9 @@ norm(vec) = √sum(vec .^ 2)
 function initialize_model(;
     dims = (20,20),
     n_copepod = 100,
-    n_phytoplankton = 900,
+    n_phytoplankton = 400,
     n_grazer = 200, # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
-    n_parasite = 100, #continuous stream of "newly introduced parasites": x amount of bird introduce each: 8000 eggs, only 20% hatch (Merle), check literature 
+    n_parasite = 400, #continuous stream of "newly introduced parasites": x amount of bird introduce each: 8000 eggs, only 20% hatch (Merle), check literature 
     Δenergy_copepod = 20, #??? 
     Δenergy_grazer = 20, #??? 
     Δenergy_parasite = 10,#???   
@@ -154,8 +154,7 @@ function initialize_model(;
     end
     return model
 end
-
-
+    
 function model_step!(agent::CopepodGrazerParasitePhytoplankton, model)
     if agent.type == :copepod
         copepod_step!(agent, model)
@@ -168,6 +167,17 @@ function model_step!(agent::CopepodGrazerParasitePhytoplankton, model)
     end
 end
 
+
+function phytoplankton_step!(phytoplankton, model)
+    phytoplankton.age += 1
+    if phytoplankton.age >= 20
+        kill_agent!(phytoplankton, model)
+        return
+    end
+    phytoplankton.energy += 1
+    phytoplankton_reproduce!(phytoplankton, model)
+end
+    
 function parasite_step!(parasite, model) #in lab: 2 days max (Parasites move really quickly, maybe even follow copepods), copepod 4 days max without food 
     parasite.energy -= 1
     if parasite.energy < 0
@@ -363,14 +373,6 @@ function phytoplankton_reproduce!(phytoplankton, model)
 end
 
 
-function phytoplankton_step!(phytoplankton, model)
-    phytoplankton.age += 1
-    if phytoplankton.age >= 20
-        kill_agent!(rand(model.rng, phytoplankton), model)
-    end
-    phytoplankton.energy += 1
-    phytoplankton_reproduce!(phytoplankton, model)
-end
 
 
 function offset(a)
@@ -385,7 +387,7 @@ function ashape(a)
     elseif a.type == :parasite
         :hline
     else 
-        :square
+        :rect
     end
 end
 
@@ -417,32 +419,30 @@ fig
 grazer(a) = a.type == :grazer
 copepod(a) = a.type == :copepod
 parasite(a) = a.type == :parasite
-#count_phytoplankton(model) = count(model.phytoplankton)
+phytoplankton(a) = a.type == :phytoplankton
 
-n = 100
-adata = [(grazer, count), (copepod, count), (parasite, count)]
-#mdata = [count_phytoplankton]
-adf = run!(model, model_step!, phytoplankton_step!, n; adata)
+n = 10
+adata = [(grazer, count), (copepod, count), (parasite, count), (phytoplankton, count)]
+adf = run!(model, model_step!, n; adata)
 
-function plot_population_timeseries(adf)
-    figure = Figure(resolution = (600, 400))
-    ax = figure[1, 1] = Axis(figure; xlabel = "Step", ylabel = "Population")
-    grazerl = lines!(ax, adf.step, adf.count_grazer, color = :yellow)
-    copepodl = lines!(ax, adf.step, adf.count_copepod, color = :black)
-    parasitel = lines!(ax, adf.step, adf.count_parasite, color = :magenta)
-    #phytoplanktonl = lines!(ax,mdf.step, mdf.count_phytoplankton, color = :green)
-    figure[1, 2] = Legend(figure, [grazerl, copepodl, parasitel], ["Grazers", "Copepods", "Parasites"])
-    figure
-end
+# function plot_population_timeseries(adf)
+#     figure = Figure(resolution = (600, 400))
+#     ax = figure[1, 1] = Axis(figure; xlabel = "Step", ylabel = "Population")
+#     grazerl = lines!(ax, adf.step, adf.count_grazer, color = :yellow)
+#     copepodl = lines!(ax, adf.step, adf.count_copepod, color = :black)
+#     parasitel = lines!(ax, adf.step, adf.count_parasite, color = :magenta)
+#     phytoplanktonl = lines!(ax, adf.step, adf.count_phytoplankton, color = :green)
+#     figure[1, 2] = Legend(figure, [grazerl, copepodl, parasitel], ["Grazers", "Copepods", "Parasites"])
+#     figure
+# end
 
-plot_population_timeseries(adf,mdf)
+#plot_population_timeseries(adf)
 
 abm_video(
     "copepodparasite.mp4",
     model,
-    model_step!, 
-    phytoplankton_step!
-    frames = 150,
+    model_step!;
+    frames = 10,
     framerate = 8,
     plotkwargs...,
 )
