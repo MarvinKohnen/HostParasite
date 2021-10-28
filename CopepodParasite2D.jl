@@ -295,7 +295,7 @@ function copepod_eat!(copepod, model) #copepod eat around their general vicinity
         #kill_agent!(food, model)
         kill_agent!(rand(model.rng, food), model, model.pathfinder)
         copepod.energy += copepod.Δenergy
-        println("Eaten")
+        #println("Eaten")
     end
 
     infection = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :parasite]
@@ -303,6 +303,7 @@ function copepod_eat!(copepod, model) #copepod eat around their general vicinity
         #infection = rand(model.rng, parasite )
         kill_agent!(rand(model.rng, infection), model, model.pathfinder)
         copepod.infected = true
+        #println("infected")
     end
 end
 
@@ -418,7 +419,7 @@ end
 
 plotkwargs = (
     ac = acolor,
-    as = 10,
+    as = 15,
     am = ashape,
     offset = offset,
 )
@@ -433,25 +434,25 @@ copepodInf(a) = a.type == :copepod && a.infected == true
 parasite(a) = a.type == :parasite
 phytoplankton(a) = a.type == :phytoplankton
 
-n = 10
+n = 100
 adata = [(grazer, count), (copepod, count), (parasite, count), (phytoplankton, count), (copepodInf, count)]
 adf = run!(model, model_step!, n; adata)
 
-# function plot_population_timeseries(adf)
-#     figure = Figure(resolution = (600, 400))
-#     ax = figure[1, 1] = Axis(figure; xlabel = "Step", ylabel = "Population")
-#     grazerl = lines!(ax, adf.step, adf.count_grazer, color = :yellow)
-#     copepodl = lines!(ax, adf.step, adf.count_copepod, color = :black)
-#     parasitel = lines!(ax, adf.step, adf.count_parasite, color = :magenta)
-#     phytoplanktonl = lines!(ax, adf.step, adf.count_phytoplankton, color = :green)
-#     figure[1, 2] = Legend(figure, [grazerl, copepodl, parasitel], ["Grazers", "Copepods", "Parasites"])
-#     figure
-# end
+function plot_population_timeseries(adf)
+    figure = Figure(resolution = (600, 400))
+    ax = figure[1, 1] = Axis(figure; xlabel = "Step", ylabel = "Population")
+    grazerl = lines!(ax, adf.step, adf.count_grazer, color = :yellow)
+    copepodl = lines!(ax, adf.step, adf.count_copepod, color = :black)
+    parasitel = lines!(ax, adf.step, adf.count_parasite, color = :magenta)
+    phytoplanktonl = lines!(ax, adf.step, adf.count_phytoplankton, color = :green)
+    figure[1, 2] = Legend(figure, [grazerl, copepodl, parasitel, phytoplanktonl], ["Grazers", "Copepods", "Parasites", "Phytoplankton"])
+    figure
+end
 
-#plot_population_timeseries(adf)
+plot_population_timeseries(adf)
 
 abm_video(
-    "copepodparasite.mp4",
+    "HostParasiteModel.mp4",
     model,
     model_step!;
     frames = 10,
