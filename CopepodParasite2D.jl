@@ -180,7 +180,8 @@ function parasite_step!(parasite, model) #in lab: 2 days max (Parasites move rea
 end
 
 function grazer_step!(grazer, model) 
-    agents = collect(agents_in_position(grazer.pos, model))   #[x for x in nearby_agents(grazer, model, grazer_vision) if x.type == :phytoplankton]
+    #plankton =[x for x in nearby_agents(grazer, model) if x.type == :phytoplankton]
+    agents = collect(agents_in_position(grazer.pos, model))
     plankton = filter!(x -> x.type == :phytoplankton, agents)
     grazer_eat!(grazer, plankton, model)
     grazer.age += 1
@@ -237,8 +238,8 @@ function grazer_step!(grazer, model)
 end
  
 function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (parasties want to stay in that vicinity)
-    #food = [x for x in nearby_agents(copepod, model, copepod_vision) if x.type == :grazer]
-    #infection = [x for x in nearby_agents(copepod, model, copepod_vision) if x.type == :parasite] 
+    #food = [x for x in nearby_agents(copepod, model) if x.type == :grazer]
+    #infection = [x for x in nearby_agents(copepod, model) if x.type == :parasite] 
     agents = collect(agents_in_position(copepod.pos, model))
     food = filter!(x -> x.type == :grazer, agents)
     infection = filter!(x -> x.type == :parasite, agents)
@@ -255,7 +256,7 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
     end
 
     if is_stationary(copepod, model.pathfinder)
-        prey = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :grazer && x.age >= 10]
+        prey = [x for x in nearby_agents(copepod, model) if x.type == :grazer && x.age >= 10]
         if isempty(prey)
             #move anywhere if no prey nearby
             set_target!(
@@ -282,7 +283,7 @@ function copepod_eat!(copepod, food, infection, model) #copepod eat around their
         copepod.energy += copepod.Δenergy
     end
     if !isempty(infection)
-        kill_agent!(rand(model.rng, infection), model, model.pathfinder)
+        kill_agent!(rand(model.rng, infection), model)
         copepod.infected = true
     end
 end
@@ -416,7 +417,9 @@ fig
 
 grazer(a) = a.type == :grazer
 copepod(a) = a.type == :copepod
+copepodInf(a) = a.type == :copepod && a.infected == true
 parasite(a) = a.type == :parasite
+<<<<<<< Updated upstream
 #count_phytoplankton(model) = count(model.phytoplankton)
 
 n = 100
@@ -434,6 +437,24 @@ function plot_population_timeseries(adf)
     figure[1, 2] = Legend(figure, [grazerl, copepodl, parasitel], ["Grazers", "Copepods", "Parasites"])
     figure
 end
+=======
+phytoplankton(a) = a.type == :phytoplankton
+
+n = 10
+adata = [(grazer, count), (copepod, count), (parasite, count), (phytoplankton, count), (copepodInf, count)]
+adf = run!(model, model_step!, n; adata)
+
+# function plot_population_timeseries(adf)
+#     figure = Figure(resolution = (600, 400))
+#     ax = figure[1, 1] = Axis(figure; xlabel = "Step", ylabel = "Population")
+#     grazerl = lines!(ax, adf.step, adf.count_grazer, color = :yellow)
+#     copepodl = lines!(ax, adf.step, adf.count_copepod, color = :black)
+#     parasitel = lines!(ax, adf.step, adf.count_parasite, color = :magenta)
+#     phytoplanktonl = lines!(ax, adf.step, adf.count_phytoplankton, color = :green)
+#     figure[1, 2] = Legend(figure, [grazerl, copepodl, parasitel], ["Grazers", "Copepods", "Parasites"])
+#     figure
+# end
+>>>>>>> Stashed changes
 
 plot_population_timeseries(adf,mdf)
 
