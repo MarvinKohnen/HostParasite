@@ -250,9 +250,9 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
     #food = [x for x in nearby_agents(copepod, model, copepod_vision) if x.type == :grazer]
     #infection = [x for x in nearby_agents(copepod, model, copepod_vision) if x.type == :parasite] 
     agents = collect(agents_in_position(copepod.pos, model))
-    food = filter!(x -> x.type == :grazer, agents)
+    #food = filter!(x -> x.type == :grazer, agents)
     infection = filter!(x -> x.type == :parasite, agents)
-    copepod_eat!(copepod, food, infection, model)  
+    copepod_eat!(copepod, agents, infection, model)  
     copepod.age += 1
     copepod.energy -= 1
     if copepod.energy < 0
@@ -286,13 +286,17 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
 
 end
 
-function copepod_eat!(copepod, food, infection, model) #copepod eat around their general vicinity
+function copepod_eat!(copepod, agents, infection, model) #copepod eat around their general vicinity
+    food = filter!(x -> x.type == :grazer, agents)
+    
     if !isempty(food)
-        kill_agent!(rand(model.rng, food), model, model.pathfinder)
+        kill_agent!(food, model)
         copepod.energy += copepod.Δenergy
+        println("grazer eaten")
     end
     if !isempty(infection)
-        kill_agent!(rand(model.rng, infection), model, model.pathfinder)
+        #kill_agent!(rand(model.rng, infection), model, model.pathfinder)
+        kill_agent!(infection, model)
         copepod.infected = true
     end
 end
@@ -418,12 +422,21 @@ fig
 
 grazer(a) = a.type == :grazer
 copepod(a) = a.type == :copepod
+copepodInf(a) = a.type == :copepod && a.infected == true
 parasite(a) = a.type == :parasite
 phytoplankton(a) = a.type == :phytoplankton
 
-n = 10
-adata = [(grazer, count), (copepod, count), (parasite, count), (phytoplankton, count)]
+n = 2
+adata = [(grazer, count), (copepod, count), (copepodInf, count), (parasite, count), (phytoplankton, count)]
 adf = run!(model, model_step!, n; adata)
+
+
+n = 10
+model = initialize_model(n_parasite = 40000, 
+ n_copepod = 4000)
+adata = [(grazer, count), (copepod, count), (copepodInf, count), (parasite, count), (phytoplankton, count)]
+adf = run!(model, model_step!, n; adata)
+
 
 # function plot_population_timeseries(adf)
 #     figure = Figure(resolution = (600, 400))
@@ -438,11 +451,11 @@ adf = run!(model, model_step!, n; adata)
 
 #plot_population_timeseries(adf)
 
-abm_video(
-    "copepodparasite.mp4",
-    model,
-    model_step!;
-    frames = 10,
-    framerate = 8,
-    plotkwargs...,
-)
+# abm_video(
+#     "copepodparasite.mp4",
+#     model,
+#     model_step!;
+#     frames = 10,
+#     framerate = 8,
+#     plotkwargs...,
+# )
