@@ -289,15 +289,16 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
 end
 
 function copepod_eat!(copepod, model) #copepod eat around their general vicinity
-    food = [x for x in nearby_agents(copepod, model) if x.type == :grazer]
+    food = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :grazer]
     if !isempty(food)
         #food = rand(model.rng, grazer)
         #kill_agent!(food, model)
         kill_agent!(rand(model.rng, food), model, model.pathfinder)
         copepod.energy += copepod.Δenergy
+        println("Eaten")
     end
 
-    infection = [x for x in nearby_agents(copepod, model) if x.type == :parasite]
+    infection = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :parasite]
     if !isempty(infection)
         #infection = rand(model.rng, parasite )
         kill_agent!(rand(model.rng, infection), model, model.pathfinder)
@@ -306,7 +307,7 @@ function copepod_eat!(copepod, model) #copepod eat around their general vicinity
 end
 
 function grazer_eat!(grazer, model)        
-    plankton = [x for x in nearby_agents(grazer, model) if x.type == :phytoplankton]
+    plankton = [x for x in nearby_agents(grazer, model, model.grazer_vision) if x.type == :phytoplankton]
     if !isempty(plankton)
         #plankton = rand(model.rng, phytoplankton)
         grazer.energy += grazer.Δenergy
