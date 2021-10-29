@@ -45,7 +45,7 @@ end
 norm(vec) = √sum(vec .^ 2)
 
 function initialize_model(;
-    dims = (20,20),
+    dims = (200,200),
     n_copepod = 100,
     n_phytoplankton = 1600,
     n_grazer = 400, # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
@@ -53,9 +53,9 @@ function initialize_model(;
     Δenergy_copepod = 20, #??? 
     Δenergy_grazer = 20, #??? 
     Δenergy_parasite = 10,#???   
-    copepod_vision = 2,  # how far copepods can see grazer to hunt
+    copepod_vision = 1,  # how far copepods can see grazer to hunt
     grazer_vision = 1,  # how far grazer see phytoplankton to feed on
-    parasite_vision = 2,  # how far parasites can see copepods to stay in their general vicinity
+    parasite_vision = 0.5,  # how far parasites can see copepods to stay in their general vicinity
     copepod_reproduce = 0.05, #changes if infected, see copepod_reproduce function
     grazer_reproduce = 0.05, #are not infected -> steady reproduction rate
     parasite_reproduce = 0, 
@@ -295,7 +295,7 @@ function copepod_eat!(copepod, model) #copepod eat around their general vicinity
         #kill_agent!(food, model)
         kill_agent!(rand(model.rng, food), model, model.pathfinder)
         copepod.energy += copepod.Δenergy
-        #println("Eaten")
+        # println("Eaten")
     end
 
     infection = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :parasite]
@@ -303,7 +303,7 @@ function copepod_eat!(copepod, model) #copepod eat around their general vicinity
         #infection = rand(model.rng, parasite )
         kill_agent!(rand(model.rng, infection), model, model.pathfinder)
         copepod.infected = true
-        #println("infected")
+        # println("infected")
     end
 end
 
@@ -419,14 +419,23 @@ end
 
 plotkwargs = (
     ac = acolor,
-    as = 15,
+    as = 5,
     am = ashape,
     offset = offset,
 )
-model = initialize_model()
+ model = initialize_model()
 
-fig, _ = abm_plot(model; plotkwargs...)
-fig
+
+ model = initialize_model(
+    n_copepod = 100,
+    n_phytoplankton = 5000,
+    n_grazer = 1000, # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
+    n_parasite = 400 
+
+)
+
+ fig, _ = abm_plot(model; plotkwargs...)
+ fig
 
 grazer(a) = a.type == :grazer
 copepod(a) = a.type == :copepod
@@ -434,17 +443,44 @@ copepodInf(a) = a.type == :copepod && a.infected == true
 parasite(a) = a.type == :parasite
 phytoplankton(a) = a.type == :phytoplankton
 
-n = 100
+n = 5
+
+model = initialize_model(
+    n_copepod = 100,
+    n_phytoplankton = 5000,
+    n_grazer = 1000, # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
+    n_parasite = 400 
+
+)
 adata = [(grazer, count), (copepod, count), (parasite, count), (phytoplankton, count), (copepodInf, count)]
 adf = run!(model, model_step!, n; adata)
+
+
+
+n = 100
+
+model = initialize_model(
+    n_copepod = 1000,
+    n_phytoplankton = 1000,
+    n_grazer = 1000, # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
+    n_parasite = 1000 
+
+)
+adata = [(grazer, count), (copepod, count), (parasite, count), (phytoplankton, count), (copepodInf, count)]
+adf = run!(model, model_step!, n; adata)
+
+adf = adf[1]
+
+using Plots
+plot(adf.count_copepod, adf.count_grazer)
 
 function plot_population_timeseries(adf)
     figure = Figure(resolution = (600, 400))
     ax = figure[1, 1] = Axis(figure; xlabel = "Step", ylabel = "Population")
-    grazerl = lines!(ax, adf.step, adf.count_grazer, color = :yellow)
-    copepodl = lines!(ax, adf.step, adf.count_copepod, color = :black)
-    parasitel = lines!(ax, adf.step, adf.count_parasite, color = :magenta)
-    phytoplanktonl = lines!(ax, adf.step, adf.count_phytoplankton, color = :green)
+    grazerl = lines!(ax, adf.count_grazer, color = :yellow)
+    copepodl = lines!(ax, adf.count_copepod, color = :black)
+    parasitel = lines!(ax,  adf.count_parasite, color = :magenta)
+    phytoplanktonl = lines!(ax,  adf.count_phytoplankton, color = :green)
     figure[1, 2] = Legend(figure, [grazerl, copepodl, parasitel, phytoplanktonl], ["Grazers", "Copepods", "Parasites", "Phytoplankton"])
     figure
 end
