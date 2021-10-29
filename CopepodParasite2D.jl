@@ -52,7 +52,7 @@ function initialize_model(;
     n_parasite = 400, #continuous stream of "newly introduced parasites": x amount of bird introduce each: 8000 eggs, only 20% hatch (Merle), check literature 
     Δenergy_copepod = 20, #??? 
     Δenergy_grazer = 20, #??? 
-    Δenergy_parasite = 10,#???   
+    Δenergy_parasite = 100.0,#???   
     copepod_vision = 2,  # how far copepods can see grazer to hunt
     grazer_vision = 1,  # how far grazer see phytoplankton to feed on
     parasite_vision = 2,  # how far parasites can see copepods to stay in their general vicinity
@@ -180,13 +180,15 @@ end
     
 function parasite_step!(parasite, model) #in lab: 2 days max (Parasites move really quickly, maybe even follow copepods), copepod 4 days max without food 
     parasite.energy -= 1
+    for _ in rand(5:24)
+        walk!(parasite, rand, model)
+    end
+
     if parasite.energy < 0
         kill_agent!(parasite, model, model.pathfinder)
         return
     end
-    for _ in rand(5:24)
-        walk!(parasite, rand, model)
-    end
+
 end
 
 function grazer_step!(grazer, model) 
@@ -250,13 +252,11 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
     #food = [x for x in nearby_agents(copepod, model, copepod_vision) if x.type == :grazer]
     #infection = [x for x in nearby_agents(copepod, model, copepod_vision) if x.type == :parasite] 
     agents = collect(agents_in_position(copepod.pos, model))
-    #food = filter!(x -> x.type == :grazer, agents)
-    infection = filter!(x -> x.type == :parasite, agents)
-    copepod_eat!(copepod, agents, infection, model)  
+    copepod_eat!(copepod, agents, model)  
     copepod.age += 1
     copepod.energy -= 1
     if copepod.energy < 0
-        kill_agent!(copepod, model, model.pathfinder)
+        kill_agent!(copepod, model)
         return
     end
 
@@ -286,18 +286,21 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
 
 end
 
-function copepod_eat!(copepod, agents, infection, model) #copepod eat around their general vicinity
+
+function copepod_eat!(copepod, agents, model) #copepod eat around their general vicinity
     food = filter!(x -> x.type == :grazer, agents)
-    
+
     if !isempty(food)
-        kill_agent!(food, model)
+        kill_agent!(rand(model.rng, food), model, model.pathfinder) # # rand(model.rng, food) randomly selects a single agent
+        println("copepod ate")
         copepod.energy += copepod.Δenergy
-        println("grazer eaten")
     end
+
+    infection = filter!(x -> x.type == :parasite, agents)
     if !isempty(infection)
-        #kill_agent!(rand(model.rng, infection), model, model.pathfinder)
-        kill_agent!(infection, model)
+        kill_agent!(rand(model.rng, infection), model, model.pathfinder)
         copepod.infected = true
+        println("copepod infected")
     end
 end
 
@@ -395,30 +398,6 @@ function ashape(a)
     end
 end
 
-function acolor(a)
-    if a.type == :copepod
-        :black 
-    elseif (a.type == :copepod) && (a.infected == true)
-        :red
-    elseif a.type == :grazer 
-        :yellow
-    elseif a.type == :parasite
-        :magenta
-    else 
-        :green
-    end
-end
-
-plotkwargs = (
-    ac = acolor,
-    as = 10,
-    am = ashape,
-    offset = offset,
-)
-model = initialize_model()
-
-fig, _ = abm_plot(model; plotkwargs...)
-fig
 
 grazer(a) = a.type == :grazer
 copepod(a) = a.type == :copepod
@@ -426,16 +405,47 @@ copepodInf(a) = a.type == :copepod && a.infected == true
 parasite(a) = a.type == :parasite
 phytoplankton(a) = a.type == :phytoplankton
 
+model = initialize_model()
 n = 2
 adata = [(grazer, count), (copepod, count), (copepodInf, count), (parasite, count), (phytoplankton, count)]
 adf = run!(model, model_step!, n; adata)
 
 
-n = 10
+n = 50
 model = initialize_model(n_parasite = 40000, 
  n_copepod = 4000)
 adata = [(grazer, count), (copepod, count), (copepodInf, count), (parasite, count), (phytoplankton, count)]
 adf = run!(model, model_step!, n; adata)
+
+
+model[40]
+collect(agents_in_position(model[40], model))
+
+
+# function acolor(a)
+#     if a.type == :copepod
+#         :black 
+#     elseif (a.type == :copepod) && (a.infected == true)
+#         :red
+#     elseif a.type == :grazer 
+#         :yellow
+#     elseif a.type == :parasite
+#         :magenta
+#     else 
+#         :green
+#     end
+# end
+
+# plotkwargs = (
+#     ac = acolor,
+#     as = 10,
+#     am = ashape,
+#     offset = offset,
+# )
+# model = initialize_model()
+
+# fig, _ = abm_plot(model; plotkwargs...)
+# fig
 
 
 # function plot_population_timeseries(adf)
