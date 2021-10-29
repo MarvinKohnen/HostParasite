@@ -252,19 +252,35 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
     #food = [x for x in nearby_agents(copepod, model, copepod_vision) if x.type == :grazer]
     #infection = [x for x in nearby_agents(copepod, model, copepod_vision) if x.type == :parasite] 
     agents = collect(agents_in_position(copepod.pos, model))
-    copepod_eat!(copepod, agents, model)  
+    food = filter!(x -> x.type == :grazer, agents)
+
+
+
+    copepod_eat!(copepod, food, model)  
     copepod.age += 1
     copepod.energy -= 1
+
+    agents = collect(agents_in_position(copepod.pos, model))
+    infection = filter!(x -> x.type == :parasite, agents)
+    copepod_infect!(copepod, infection, model)  
+
+    
     if copepod.energy < 0
-        kill_agent!(copepod, model)
+        kill_agent!(rand(model.rng, copepod), model, model.pathfinder)
+       
         return
     end
 
+    
+    
+
     if rand(model.rng) <= copepod.reproduction_prob 
         copepod_reproduce!(copepod, model)
+        
     end
 
     if is_stationary(copepod, model.pathfinder)
+        println("copepods stationary")
         prey = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :grazer && x.age >= 10]
         if isempty(prey)
             #move anywhere if no prey nearby
@@ -287,19 +303,24 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
 end
 
 
-function copepod_eat!(copepod, agents, model) #copepod eat around their general vicinity
-    food = filter!(x -> x.type == :grazer, agents)
-
+function copepod_eat!(copepod, food, model) #copepod eat around their general vicinity
+    
     if !isempty(food)
         kill_agent!(rand(model.rng, food), model, model.pathfinder) # # rand(model.rng, food) randomly selects a single agent
-        println("copepod ate")
+        #println("copepod ate")
         copepod.energy += copepod.Δenergy
+        return
     end
 
-    infection = filter!(x -> x.type == :parasite, agents)
+
+end
+
+
+function copepod_infect!(copepod, infection, model)
     if !isempty(infection)
         kill_agent!(rand(model.rng, infection), model, model.pathfinder)
         copepod.infected = true
+        return
         println("copepod infected")
     end
 end
@@ -412,14 +433,11 @@ adf = run!(model, model_step!, n; adata)
 
 
 n = 50
-model = initialize_model(n_parasite = 40000, 
- n_copepod = 4000)
+model = initialize_model(n_parasite = 4000, 
+ n_copepod = 400)
 adata = [(grazer, count), (copepod, count), (copepodInf, count), (parasite, count), (phytoplankton, count)]
 adf = run!(model, model_step!, n; adata)
 
-
-model[40]
-collect(agents_in_position(model[40], model))
 
 
 # function acolor(a)
