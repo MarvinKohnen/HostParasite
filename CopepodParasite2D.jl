@@ -423,19 +423,11 @@ plotkwargs = (
     am = ashape,
     offset = offset,
 )
- model = initialize_model()
 
+model = initialize_model()
 
- model = initialize_model(
-    n_copepod = 100,
-    n_phytoplankton = 5000,
-    n_grazer = 1000, # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
-    n_parasite = 400 
-
-)
-
- fig, _ = abm_plot(model; plotkwargs...)
- fig
+fig, _ = abm_plot(model; plotkwargs...)
+fig
 
 grazer(a) = a.type == :grazer
 copepod(a) = a.type == :copepod
@@ -443,33 +435,11 @@ copepodInf(a) = a.type == :copepod && a.infected == true
 parasite(a) = a.type == :parasite
 phytoplankton(a) = a.type == :phytoplankton
 
-n = 5
-
-model = initialize_model(
-    n_copepod = 100,
-    n_phytoplankton = 5000,
-    n_grazer = 1000, # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
-    n_parasite = 400 
-
-)
+n=5
 adata = [(grazer, count), (copepod, count), (parasite, count), (phytoplankton, count), (copepodInf, count)]
 adf = run!(model, model_step!, n; adata)
 
-
-
-n = 100
-
-model = initialize_model(
-    n_copepod = 1000,
-    n_phytoplankton = 1000,
-    n_grazer = 1000, # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
-    n_parasite = 1000 
-
-)
-adata = [(grazer, count), (copepod, count), (parasite, count), (phytoplankton, count), (copepodInf, count)]
-adf = run!(model, model_step!, n; adata)
-
-adf = adf[1]
+#adf = adf[1]
 
 using Plots
 plot(adf.count_copepod, adf.count_grazer)
