@@ -47,12 +47,13 @@ norm(vec) = √sum(vec .^ 2)
 function initialize_model(;
     dims = (200,200),
     n_copepod = 100,
-    n_phytoplankton = 1600,
+    n_phytoplankton = 400,
     n_grazer = 400, # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
-    n_parasite = 400, #continuous stream of "newly introduced parasites": x amount of bird introduce each: 8000 eggs, only 20% hatch (Merle), check literature 
-    Δenergy_copepod = 20, #??? 
-    Δenergy_grazer = 20, #??? 
-    Δenergy_parasite = 10,#???   
+    n_parasite = 200, 
+    n_eggs = 200, #continuous stream of "newly introduced parasites"
+    Δenergy_copepod = 96, #4 days
+    Δenergy_grazer = 96, #4 days
+    Δenergy_parasite = 48,# 2 days   
     copepod_vision = 1,  # how far copepods can see grazer to hunt
     grazer_vision = 1,  # how far grazer see phytoplankton to feed on
     parasite_vision = 0.5,  # how far parasites can see copepods to stay in their general vicinity
@@ -67,6 +68,8 @@ function initialize_model(;
     parasite_size = 0.1,
     phytoplankton_age =0,
     phytoplankton_energy = 0,
+    eggs_prob = 0.05,   #probability for eggs to get introduced -> roughly once a day -> 1/24
+    hatch_prob = 0.20, #probability for eggs to hatch, 20% as to Merles results (Parasite_eggs excel in Dropbox)
     seed = 23182,    
     )
 
@@ -91,7 +94,9 @@ function initialize_model(;
         grazer_size = grazer_size,
         parasite_size = parasite_size,
         phytoplankton_age = phytoplankton_age,
-        phytoplankton_energy = phytoplankton_energy
+        phytoplankton_energy = phytoplankton_energy,
+        eggs_prob = eggs_prob,
+        hatch_prob = hatch_prob
     )
     
     model = ABM(CopepodGrazerParasitePhytoplankton, space; properties, rng, scheduler = Schedulers.randomly)
@@ -101,7 +106,7 @@ function initialize_model(;
             Copepod(
                 nextid(model),
                 random_walkable(model, model.pathfinder),
-                rand(1:(Δenergy_copepod*2)) - 1,
+                rand(1:(Δenergy_copepod*1)) - 1,
                 copepod_reproduce,
                 Δenergy_copepod,
                 0,
@@ -116,7 +121,7 @@ function initialize_model(;
             Grazer(
                 nextid(model),
                 random_walkable(model, model.pathfinder),
-                rand(1:(Δenergy_grazer*2)) - 1,
+                rand(1:(Δenergy_grazer*1)) - 1,
                 grazer_reproduce,
                 Δenergy_grazer,
                 0,
@@ -131,7 +136,7 @@ function initialize_model(;
             Parasite(
                 nextid(model),
                 random_walkable(model, model.pathfinder),
-                rand(1:(Δenergy_parasite*2)) - 1,
+                rand(1:(Δenergy_parasite*1)) - 1,
                 parasite_reproduce,
                 Δenergy_parasite,
                 0,
@@ -170,7 +175,7 @@ end
 
 function phytoplankton_step!(phytoplankton, model)
     phytoplankton.age += 1
-    if phytoplankton.age >= 20
+    if phytoplankton.age >= 48 #"a couple of days" e.g. 2 up to 23 days (https://acp.copernicus.org/articles/10/9295/2010/)??? 
         kill_agent!(phytoplankton, model)
         return
     end
@@ -179,13 +184,36 @@ function phytoplankton_step!(phytoplankton, model)
 end
     
 function parasite_step!(parasite, model) #in lab: 2 days max (Parasites move really quickly, maybe even follow copepods), copepod 4 days max without food 
-    parasite.energy -= 1
+parasite.energy -= 1
     if parasite.energy < 0
         kill_agent!(parasite, model, model.pathfinder)
         return
     end
     for _ in rand(5:24)
         walk!(parasite, rand, model)
+    end
+    introduce_eggs!(parasite, model)
+end
+
+function introduce_eggs!(parasite, model)
+    if rand(model.rng) <= model.eggs_prob
+        id = nextid(model)
+        for _ in 1:n_eggs
+            if rand(model.rng) <= model.hatch_prob
+                eggs = Parasite(
+                id,
+                random_walkable(model, model.pathfinder),
+                rand(1:(Δenergy_parasite*1)) - 1,
+                parasite_reproduce,
+                Δenergy_parasite,
+                0,
+                parasite_size,
+                ),
+                model,
+            add_agent_pos!(eggs, model)
+            end
+        return
+        end
     end
 end
 
@@ -406,7 +434,7 @@ end
 function acolor(a)
     if a.type == :copepod
         :black 
-    elseif (a.type == :copepod) && (a.infected == true)
+    elseif a.infected == true  #what else is there to try? 
         :red
     elseif a.type == :grazer 
         :yellow
@@ -435,33 +463,38 @@ copepodInf(a) = a.type == :copepod && a.infected == true
 parasite(a) = a.type == :parasite
 phytoplankton(a) = a.type == :phytoplankton
 
-n=5
+n=5 #what does this do? 
 adata = [(grazer, count), (copepod, count), (parasite, count), (phytoplankton, count), (copepodInf, count)]
 adf = run!(model, model_step!, n; adata)
 
 #adf = adf[1]
 
 using Plots
-plot(adf.count_copepod, adf.count_grazer)
+#plot(adf.count_copepod, adf.count_grazer)
 
-function plot_population_timeseries(adf)
-    figure = Figure(resolution = (600, 400))
-    ax = figure[1, 1] = Axis(figure; xlabel = "Step", ylabel = "Population")
-    grazerl = lines!(ax, adf.count_grazer, color = :yellow)
-    copepodl = lines!(ax, adf.count_copepod, color = :black)
-    parasitel = lines!(ax,  adf.count_parasite, color = :magenta)
-    phytoplanktonl = lines!(ax,  adf.count_phytoplankton, color = :green)
-    figure[1, 2] = Legend(figure, [grazerl, copepodl, parasitel, phytoplanktonl], ["Grazers", "Copepods", "Parasites", "Phytoplankton"])
-    figure
-end
+# function plot_population_timeseries(adf)
+#     figure = Figure(resolution = (600, 400))
+#     ax = figure[1, 1] = Axis(figure; xlabel = "Step", ylabel = "Population")
+#     grazerl = lines!(ax, adf.count_grazer, color = :yellow)
+#     copepodl = lines!(ax, adf.count_copepod, color = :black)
+#     parasitel = lines!(ax,  adf.count_parasite, color = :magenta)
+#     phytoplanktonl = lines!(ax,  adf.count_phytoplankton, color = :green)
+#     figure[1, 2] = Legend(figure, [grazerl, copepodl, parasitel, phytoplanktonl], ["Grazers", "Copepods", "Parasites", "Phytoplankton"])
+#     figure
+# end
 
-plot_population_timeseries(adf)
+#plot_population_timeseries(adf)
 
 abm_video(
     "HostParasiteModel.mp4",
     model,
     model_step!;
-    frames = 10,
+    frames = 4, #"Steps"
     framerate = 8,
     plotkwargs...,
 )
+
+#Results: 
+#1 Grazers overpopulate
+#2 still no infected copepods shown, they do exist tho
+
