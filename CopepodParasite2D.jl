@@ -306,7 +306,7 @@ function copepod_reproduce!(copepod, model)
             id = nextid(model)
             offspring = CopepodGrazerParasitePhytoplankton(
                 id,
-                copepod.pos,
+                copepod.pos, # fix copepod and grazers position
                 copepod.type,
                 copepod.energy,
                 copepod.reproduction_prob,
