@@ -50,7 +50,7 @@ function initialize_model(;
     n_phytoplankton = 400,
     n_grazer = 400, # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
     n_parasite = 200, 
-    n_eggs = 200, #continuous stream of "newly introduced parasites"
+    #n_eggs = 200, #continuous stream of "newly introduced parasites"
     Δenergy_copepod = 96, #4 days
     Δenergy_grazer = 96, #4 days
     Δenergy_parasite = 48,# 2 days   
@@ -161,6 +161,12 @@ function initialize_model(;
 end
     
 function model_step!(agent::CopepodGrazerParasitePhytoplankton, model)
+    step_counter = 0
+    step_counter += 1
+    if step_counter % 24 == 0 #once per day
+        introduce_eggs!(model)
+    end
+
     if agent.type == :copepod
         copepod_step!(agent, model)
     elseif agent.type == :grazer 
@@ -184,38 +190,53 @@ function phytoplankton_step!(phytoplankton, model)
 end
     
 function parasite_step!(parasite, model) #in lab: 2 days max (Parasites move really quickly, maybe even follow copepods), copepod 4 days max without food 
-parasite.energy -= 1
+    parasite.energy -= 1
     if parasite.energy < 0
         kill_agent!(parasite, model, model.pathfinder)
         return
     end
-    for _ in rand(5:24)
-        walk!(parasite, rand, model)
+    if is_stationary(parasite, model.pathfinder)
+        host = [x for x in nearby_agents(parasite, model) if x.type == :copepod && x.age >= 10]  #! change age of copepods that can get infected
+        if isempty(host)
+            #move anywhere if no prey nearby
+            set_target!(
+                parasite,
+                random_walkable(model, model.pathfinder),
+                model.pathfinder
+            )
+            return
+        end
+        set_target!(parasite, rand(model.rng, map(x -> x.pos, host)), model.pathfinder)
     end
-    introduce_eggs!(parasite, model)
+    for _ in rand(5:24)
+        move_along_route!(parasite, model, model.pathfinder)
+    end
 end
 
-function introduce_eggs!(parasite, model)
+function introduce_eggs!(model)
     if rand(model.rng) <= model.eggs_prob
-        id = nextid(model)
-        for _ in 1:n_eggs
+        for _ in 1:200
+            id = nextid(model)
             if rand(model.rng) <= model.hatch_prob
-                eggs = Parasite(
-                id,
-                random_walkable(model, model.pathfinder),
-                rand(1:(Δenergy_parasite*1)) - 1,
-                parasite_reproduce,
-                Δenergy_parasite,
-                0,
-                parasite_size,
-                ),
-                model,
-            add_agent_pos!(eggs, model)
+                eggs = CopepodGrazerParasitePhytoplankton(
+                    id,
+                    random_walkable(model, model.pathfinder),
+                    :parasite,
+                    rand(1:(Δenergy_parasite*1)) - 1,
+                    parasite_reproduce,
+                    Δenergy_parasite,
+                    :false,
+                    0,
+                    1,
+                    parasite_size,
+                )
             end
-        return
+        add_agent!(eggs, model)
         end
+    return
     end
 end
+
 
 function grazer_step!(grazer, model) 
     #plankton =[x for x in nearby_agents(grazer, model) if x.type == :phytoplankton]
@@ -356,7 +377,7 @@ function copepod_reproduce!(copepod, model)
             id = nextid(model)
             offspring = CopepodGrazerParasitePhytoplankton(
                 id,
-                copepod.pos,
+                random_walkable(model, model.pathfinder),
                 copepod.type,
                 copepod.energy,
                 copepod.reproduction_prob,
@@ -380,7 +401,7 @@ function grazer_reproduce!(grazer, model)
             id = nextid(model)
             offspring = CopepodGrazerParasitePhytoplankton(
                 id,
-                grazer.pos,
+                random_walkable(model, model.pathfinder),
                 grazer.type,
                 grazer.energy,
                 grazer.reproduction_prob,
@@ -411,9 +432,6 @@ function phytoplankton_reproduce!(phytoplankton, model)
     return
     end
 end
-
-
-
 
 function offset(a)
     a.type == :copepod ? (-0.7, -0.5) : (-0.3, -0.5)
@@ -463,7 +481,7 @@ copepodInf(a) = a.type == :copepod && a.infected == true
 parasite(a) = a.type == :parasite
 phytoplankton(a) = a.type == :phytoplankton
 
-n=5 #what does this do? 
+n=25 
 adata = [(grazer, count), (copepod, count), (parasite, count), (phytoplankton, count), (copepodInf, count)]
 adf = run!(model, model_step!, n; adata)
 
