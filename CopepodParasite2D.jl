@@ -424,7 +424,7 @@ function phytoplankton_reproduce!(phytoplankton, model)
         id = nextid(model)
         offspring = Phytoplankton(
             id,
-            phytoplankton.pos,
+            random_walkable(model, model.pathfinder),
             0,
             0,
         )
@@ -481,7 +481,7 @@ copepodInf(a) = a.type == :copepod && a.infected == true
 parasite(a) = a.type == :parasite
 phytoplankton(a) = a.type == :phytoplankton
 
-n=25 
+n=10 
 adata = [(grazer, count), (copepod, count), (parasite, count), (phytoplankton, count), (copepodInf, count)]
 adf = run!(model, model_step!, n; adata)
 
@@ -507,7 +507,7 @@ abm_video(
     "HostParasiteModel.mp4",
     model,
     model_step!;
-    frames = 4, #"Steps"
+    frames = 25, 
     framerate = 8,
     plotkwargs...,
 )
