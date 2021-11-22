@@ -47,8 +47,8 @@ norm(vec) = √sum(vec .^ 2)
 function initialize_model(;
     dims = (200,200),
     n_copepod = 100,
-    n_phytoplankton = 400,
-    n_grazer = 400, # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
+    n_phytoplankton = 200,
+    n_grazer = 100, # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
     n_parasite = 200, 
     #n_eggs = 200, #continuous stream of "newly introduced parasites"
     Δenergy_copepod = 96, #4 days
