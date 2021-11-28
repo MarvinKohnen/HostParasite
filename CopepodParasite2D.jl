@@ -1,6 +1,13 @@
-#Add incoming parasites?
-#Phytoplankton as their own mutable struct -> Union command 
-#Energy transmission 
+#Energy transmission (0.75 from prey to predator) doesnt work, does it?
+#Parasite Introduction in model_step function doesnt work
+#introduce temperature as they are all cold blooded organisms
+#Size? multiplicate vision radius with size?
+#numbers: merles data: some repetitions, almost equal distribution of copepod and grazer (just chydoridae and cyclopods)
+#mortality for copepods (simulate sticklebacks)
+#mortality for phytoplankton (simulate all other zooplankton)
+#have copepods feed on phytoplankton?
+#how to incorporate larval stages of copepod and grazers, give them a mortality as well?
+
 
 using Random
 using Agents
@@ -46,9 +53,9 @@ norm(vec) = √sum(vec .^ 2)
 
 function initialize_model(;
     dims = (200,200),
-    n_copepod = 100,
+    n_copepod = 478,
     n_phytoplankton = 200,
-    n_grazer = 100, # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
+    n_grazer = 500, # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
     n_parasite = 200, 
     #n_eggs = 200, #continuous stream of "newly introduced parasites"
     Δenergy_copepod = 96, #4 days
@@ -68,6 +75,9 @@ function initialize_model(;
     parasite_size = 0.1,
     phytoplankton_age =0,
     phytoplankton_energy = 0,
+    copepod_mortality = 0.05,
+    #grazer_mortality = 0.1,
+    phytoplankton_mortality = 0.1,
     eggs_prob = 0.05,   #probability for eggs to get introduced -> roughly once a day -> 1/24
     hatch_prob = 0.20, #probability for eggs to hatch, 20% as to Merles results (Parasite_eggs excel in Dropbox)
     seed = 23182,    
@@ -96,7 +106,10 @@ function initialize_model(;
         phytoplankton_age = phytoplankton_age,
         phytoplankton_energy = phytoplankton_energy,
         eggs_prob = eggs_prob,
-        hatch_prob = hatch_prob
+        hatch_prob = hatch_prob,
+        copepod_mortality = copepod_mortality,
+        #grazer_mortality = grazer_mortality,
+        phytoplankton_mortality = phytoplankton_mortality
     )
     
     model = ABM(CopepodGrazerParasitePhytoplankton, space; properties, rng, scheduler = Schedulers.randomly)
@@ -162,19 +175,39 @@ end
     
 function model_step!(agent::CopepodGrazerParasitePhytoplankton, model)
     step_counter = 0
-    step_counter += 1
-    if step_counter % 24 == 0 #once per day
-        introduce_eggs!(model)
-    end
-
+    
     if agent.type == :copepod
         copepod_step!(agent, model)
+        step_counter = step_counter += 1
+        
+        print(step_counter)
+        if step_counter % 24 == 0 #once per day
+            introduce_eggs!(model)
+        end
+
     elseif agent.type == :grazer 
         grazer_step!(agent, model)
+        step_counter = step_counter += 1
+        print(step_counter)
+        if step_counter % 24 == 0 #once per day
+            introduce_eggs!(model)
+        end
+
     elseif agent.type == :parasite
         parasite_step!(agent, model)
+        step_counter = step_counter += 1
+        print(step_counter)
+        if step_counter % 24 == 0 #once per day
+            introduce_eggs!(model)
+        end
+
     else 
         phytoplankton_step!(agent, model)
+        step_counter = step_counter += 1
+        print(step_counter)
+        if step_counter % 24 == 0 #once per day
+            introduce_eggs!(model)
+        end
     end
 end
 
@@ -182,6 +215,10 @@ end
 function phytoplankton_step!(phytoplankton, model)
     phytoplankton.age += 1
     if phytoplankton.age >= 48 #"a couple of days" e.g. 2 up to 23 days (https://acp.copernicus.org/articles/10/9295/2010/)??? 
+        kill_agent!(phytoplankton, model)
+        return
+    end
+    if rand(model.rng) < model.phytoplankton_mortality
         kill_agent!(phytoplankton, model)
         return
     end
@@ -195,21 +232,8 @@ function parasite_step!(parasite, model) #in lab: 2 days max (Parasites move rea
         kill_agent!(parasite, model, model.pathfinder)
         return
     end
-    if is_stationary(parasite, model.pathfinder)
-        host = [x for x in nearby_agents(parasite, model) if x.type == :copepod && x.age >= 10]  #! change age of copepods that can get infected
-        if isempty(host)
-            #move anywhere if no prey nearby
-            set_target!(
-                parasite,
-                random_walkable(model, model.pathfinder),
-                model.pathfinder
-            )
-            return
-        end
-        set_target!(parasite, rand(model.rng, map(x -> x.pos, host)), model.pathfinder)
-    end
     for _ in rand(5:24)
-        move_along_route!(parasite, model, model.pathfinder)
+        walk!(parasite, rand, model)
     end
 end
 
@@ -249,6 +273,10 @@ function grazer_step!(grazer, model)
         kill_agent!(grazer, model, model.pathfinder)
         return
     end
+    #if rand(model.rng) < model.grazer_mortality
+        #kill_agent!(grazer, model)
+        #return
+    #end
     
     if rand(model.rng) <= grazer.reproduction_prob
         grazer_reproduce!(grazer, model)
@@ -310,7 +338,10 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
         kill_agent!(copepod, model, model.pathfinder)
         return
     end
-
+    if rand(model.rng) < model.copepod_mortality
+        kill_agent!(copepod, model)
+        return
+    end
     if rand(model.rng) <= copepod.reproduction_prob 
         copepod_reproduce!(copepod, model)
     end
@@ -334,7 +365,6 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
         copepod.energy -= 1
         move_along_route!(copepod, model, model.pathfinder)
     end
-
 end
 
 function copepod_eat!(copepod, model) #copepod eat around their general vicinity
@@ -481,7 +511,7 @@ copepodInf(a) = a.type == :copepod && a.infected == true
 parasite(a) = a.type == :parasite
 phytoplankton(a) = a.type == :phytoplankton
 
-n=10 
+n=25
 adata = [(grazer, count), (copepod, count), (parasite, count), (phytoplankton, count), (copepodInf, count)]
 adf = run!(model, model_step!, n; adata)
 
@@ -511,8 +541,4 @@ abm_video(
     framerate = 8,
     plotkwargs...,
 )
-
-#Results: 
-#1 Grazers overpopulate
-#2 still no infected copepods shown, they do exist tho
 
