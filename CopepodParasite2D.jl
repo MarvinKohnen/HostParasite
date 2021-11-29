@@ -1,12 +1,12 @@
 #Energy transmission (0.75 from prey to predator) doesnt work, does it?
-#Parasite Introduction in model_step function doesnt work
-#introduce temperature as they are all cold blooded organisms
+#Parasite Introduction in model_step function doesnt work -> adding fish, if fish infected, doesnt reproduce, but if it gets infected it produces parasite eggs, also preys on grazers or zooplankton in general
 #Size? multiplicate vision radius with size?
 #numbers: merles data: some repetitions, almost equal distribution of copepod and grazer (just chydoridae and cyclopods)
 #mortality for copepods (simulate sticklebacks)
 #mortality for phytoplankton (simulate all other zooplankton)
-#have copepods feed on phytoplankton?
-#how to incorporate larval stages of copepod and grazers, give them a mortality as well?
+#have copepods feed on phytoplankton? yes for early stages 
+#how to incorporate larval stages of copepod and grazers, give them a mortality as well? yes 50%
+#dont stack agents on top of each other in one position 
 
 
 using Random
@@ -403,7 +403,7 @@ function copepod_reproduce!(copepod, model)
        
         copepod.energy /= 2
 
-        for _ in 1:(rand(Normal(72, 5)))
+        for _ in 1:(rand(Normal(72, 5))) #50% survive
             id = nextid(model)
             offspring = CopepodGrazerParasitePhytoplankton(
                 id,
