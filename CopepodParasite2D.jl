@@ -6,8 +6,15 @@
 #mortality for phytoplankton (simulate all other zooplankton)
 #have copepods feed on phytoplankton? yes for early stages 
 #how to incorporate larval stages of copepod and grazers, give them a mortality as well? yes 50%
-#dont stack agents on top of each other in one position 
-
+#dont stack agents on top of each other in one position
+#limit amount of agents in general
+#sticklebacks lifespan much longer 
+#90% loss of energy each trophic level; metabolic cost  
+#validation via ensemble run 
+#infected copepods dont escape sticklebacks !!! (3 scenarios: fleeing, not fleeing, actively searching for sticklebacks)
+#adding classes of death (dead by fish, dead by energy loss, dead by mortality)
+#fish are fastest
+#movement based on relative sizes 
 
 using Random
 using Agents
