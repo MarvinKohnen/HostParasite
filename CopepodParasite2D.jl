@@ -12,9 +12,14 @@
 #90% loss of energy each trophic level; metabolic cost  
 #validation via ensemble run 
 #infected copepods dont escape sticklebacks !!! (3 scenarios: fleeing, not fleeing, actively searching for sticklebacks)
-#adding classes of death (dead by fish, dead by energy loss, dead by mortality)
+#adding classes of death (dead by fish, dead by energy loss, dead by mortality) ???
 #fish are fastest
 #movement based on relative sizes 
+
+#"The reductionist approach in ecology is relatively easy to apply if we assume that population members are either identical or that they differ only by sex and age." - include in title?
+#allagents(model)
+#has_empty_positions(model)
+
 
 using Random
 using Agents
@@ -28,7 +33,7 @@ using GLMakie
 mutable struct CopepodGrazerParasitePhytoplankton <: AbstractAgent
     id::Int #Id of the Agent
     pos::Dims{2} #position in the Space
-    type::Symbol # :Copepod or :Parasite or :Grazer or :Phytoplankton
+    type::Symbol # :Copepod or :Parasite or :Grazer or :Phytoplankton or :Stickleback
     energy::Float64 
     reproduction_prob::Float64  
     Δenergy::Float64
@@ -56,6 +61,10 @@ function Phytoplankton(id, pos, energy, age)
     CopepodGrazerParasitePhytoplankton(id, pos, :phytoplankton, energy, 0.0, 10, :false, age, 1, 0.01)
 end 
 
+function Stickleback(id, pos, energy, repr, Δe, age, size)
+    CopepodGrazerParasitePhytoplankton(id, pos, :stickleback, energy, repr, Δe, :false, age, rand(1:2), size)
+end
+
 norm(vec) = √sum(vec .^ 2)
 
 function initialize_model(;
@@ -64,27 +73,34 @@ function initialize_model(;
     n_phytoplankton = 200,
     n_grazer = 500, # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
     n_parasite = 200, 
+    n_stickleback = 10,
     #n_eggs = 200, #continuous stream of "newly introduced parasites"
     Δenergy_copepod = 96, #4 days
     Δenergy_grazer = 96, #4 days
     Δenergy_parasite = 48,# 2 days   
+    Δenergy_stickleback = 96,
     copepod_vision = 1,  # how far copepods can see grazer to hunt
     grazer_vision = 1,  # how far grazer see phytoplankton to feed on
-    parasite_vision = 0.5,  # how far parasites can see copepods to stay in their general vicinity
+    parasite_vision = 0.5,  # how far parasites can see copepods to stay in their general vicinit
+    stickleback_vision = 3,
     copepod_reproduce = 0.05, #changes if infected, see copepod_reproduce function
     grazer_reproduce = 0.05, #are not infected -> steady reproduction rate
     parasite_reproduce = 0, 
+    stickleback_reproduce = 0.05,
     copepod_age = 0,
     grazer_age = 0,
     parasite_age = 0,
+    stickleback_age =0,
     copepod_size = 1,
     grazer_size = 0.5,
     parasite_size = 0.1,
+    stickleback_size = 3,
     phytoplankton_age =0,
     phytoplankton_energy = 0,
     copepod_mortality = 0.05,
     #grazer_mortality = 0.1,
     phytoplankton_mortality = 0.1,
+    stickleback_mortality = 0.2,
     eggs_prob = 0.05,   #probability for eggs to get introduced -> roughly once a day -> 1/24
     hatch_prob = 0.20, #probability for eggs to hatch, 20% as to Merles results (Parasite_eggs excel in Dropbox)
     seed = 23182,    
@@ -98,25 +114,31 @@ function initialize_model(;
         Δenergy_copepod = Δenergy_copepod,
         Δenergy_grazer = Δenergy_grazer,
         Δenergy_parasite =Δenergy_parasite,
+        Δenergy_stickleback = Δenergy_stickleback,
         copepod_vision = copepod_vision,
         grazer_vision = grazer_vision,
         parasite_vision = parasite_vision,
+        stickleback_vision = stickleback_vision,
         copepod_reproduce = copepod_reproduce,
         grazer_reproduce = grazer_reproduce,
         parasite_reproduce = parasite_reproduce, 
+        stickleback_reproduce = stickleback_reproduce,
         copepod_age = copepod_age,
         grazer_age = grazer_age,
         parasite_age = parasite_age,
+        stickleback_age = stickleback_age,
         copepod_size = copepod_size,
         grazer_size = grazer_size,
         parasite_size = parasite_size,
+        stickleback_size = stickleback_size,
         phytoplankton_age = phytoplankton_age,
         phytoplankton_energy = phytoplankton_energy,
         eggs_prob = eggs_prob,
         hatch_prob = hatch_prob,
         copepod_mortality = copepod_mortality,
         #grazer_mortality = grazer_mortality,
-        phytoplankton_mortality = phytoplankton_mortality
+        phytoplankton_mortality = phytoplankton_mortality,
+        stickleback_mortality = stickleback_mortality
     )
     
     model = ABM(CopepodGrazerParasitePhytoplankton, space; properties, rng, scheduler = Schedulers.randomly)
@@ -131,6 +153,21 @@ function initialize_model(;
                 Δenergy_copepod,
                 0,
                 copepod_size,
+            ),
+            model,
+        )
+    end
+
+    for _ in 1:n_stickleback
+        add_agent_pos!(
+            Stickleback(
+                nextid(model),
+                random_walkable(model, model.pathfinder),
+                rand(1:(Δenergy_stickleback*1)) - 1,
+                stickleback_reproduce,
+                Δenergy_stickleback,
+                0,
+                stickleback_size,
             ),
             model,
         )
@@ -181,40 +218,16 @@ function initialize_model(;
 end
     
 function model_step!(agent::CopepodGrazerParasitePhytoplankton, model)
-    step_counter = 0
-    
     if agent.type == :copepod
         copepod_step!(agent, model)
-        step_counter = step_counter += 1
-        
-        print(step_counter)
-        if step_counter % 24 == 0 #once per day
-            introduce_eggs!(model)
-        end
-
     elseif agent.type == :grazer 
         grazer_step!(agent, model)
-        step_counter = step_counter += 1
-        print(step_counter)
-        if step_counter % 24 == 0 #once per day
-            introduce_eggs!(model)
-        end
-
     elseif agent.type == :parasite
         parasite_step!(agent, model)
-        step_counter = step_counter += 1
-        print(step_counter)
-        if step_counter % 24 == 0 #once per day
-            introduce_eggs!(model)
-        end
-
+    elseif agent.type == :stickleback
+        stickleback_step!(agent, model)
     else 
         phytoplankton_step!(agent, model)
-        step_counter = step_counter += 1
-        print(step_counter)
-        if step_counter % 24 == 0 #once per day
-            introduce_eggs!(model)
-        end
     end
 end
 
@@ -233,7 +246,7 @@ function phytoplankton_step!(phytoplankton, model)
     phytoplankton_reproduce!(phytoplankton, model)
 end
     
-function parasite_step!(parasite, model) #in lab: 2 days max (Parasites move really quickly, maybe even follow copepods), copepod 4 days max without food 
+function parasite_step!(parasite, model) #in lab: 2 days max, copepod 4 days max without food 
     parasite.energy -= 1
     if parasite.energy < 0
         kill_agent!(parasite, model, model.pathfinder)
@@ -270,9 +283,6 @@ end
 
 
 function grazer_step!(grazer, model) 
-    #plankton =[x for x in nearby_agents(grazer, model) if x.type == :phytoplankton]
-    #agents = collect(agents_in_position(grazer.pos, model))
-    #plankton = filter!(x -> x.type == :phytoplankton, agents)
     grazer_eat!(grazer, model)
     grazer.age += 1
     grazer.energy -= 1
@@ -283,6 +293,7 @@ function grazer_step!(grazer, model)
     #if rand(model.rng) < model.grazer_mortality
         #kill_agent!(grazer, model)
         #return
+        
     #end
     
     if rand(model.rng) <= grazer.reproduction_prob
@@ -291,13 +302,13 @@ function grazer_step!(grazer, model)
         
     predators = [
         x.pos for x in nearby_agents(grazer, model, model.grazer_vision) if 
-            x.type == :copepod
+            x.type == :copepod || x.type == :stickleback
     ]
 
     if !isempty(predators) && is_stationary(grazer, model.pathfinder)
-        direction = (0, 0)
+        direction = (0., 0.)
         away_direction = []
-        for i in 1: length(predators)
+        for i in 1:length(predators)
             if i == 1
                 away_direction = (grazer.pos .- predators[i]) 
             else    
@@ -315,8 +326,8 @@ function grazer_step!(grazer, model)
             #Normalize the resultant direction and get the ideal position to move it
             direction = direction ./norm(direction)
             #move to a random position in the general direction of away from predators
-            position = grazer.pos .+ direction .* (model.grazer_vision/ 2.)
-            chosen_position = random_walkable(model, model.pathfinder)
+            position = grazer.pos .+ direction .* (model.grazer_vision / 2.)
+            chosen_position = random_walkable(position, model, model.pathfinder,model.grazer_vision / 2.)
         end
         set_target!(grazer, chosen_position, model.pathfinder)
     end 
@@ -332,12 +343,6 @@ function grazer_step!(grazer, model)
 end
  
 function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (parasties want to stay in that vicinity)
-    # food = [x for x in nearby_agents(copepod, model) if x.type == :grazer]
-    # infection = [x for x in nearby_agents(copepod, model) if x.type == :parasite] 
-    # agents = collect(agents_in_position(copepod.pos, model))
-    # food = filter!(x -> x.type == :grazer, agents)
-    # agentstwo = collect(agents_in_position(copepod.pos, model))
-    # infection = filter!(x -> x.type == :parasite, agentstwo)
     copepod_eat!(copepod, model)  
     copepod.age += 1
     copepod.energy -= 1
@@ -354,7 +359,7 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
     end
 
     if is_stationary(copepod, model.pathfinder)
-        prey = [x for x in nearby_agents(copepod, model) if x.type == :grazer && x.age >= 10]
+        prey = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :grazer && x.age >= 10]
         if isempty(prey)
             #move anywhere if no prey nearby
             set_target!(
@@ -374,6 +379,45 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
     end
 end
 
+function stickleback_step!(stickleback, model) 
+    stickleback_eat!(stickleback, model)  
+    stickleback.age += 1
+    stickleback.energy -= 1
+    if stickleback.energy < 0
+        kill_agent!(stickleback, model, model.pathfinder)
+        return
+    end
+
+    if rand(model.rng) < model.stickleback_mortality
+        kill_agent!(stickleback, model)
+        return
+    end
+
+    if rand(model.rng) <= stickleback.reproduction_prob 
+        stickleback_reproduce!(stickleback, model)
+    end
+
+    if is_stationary(stickleback, model.pathfinder)
+        hunt = [x for x in nearby_agents(stickleback, model, model.stickleback_vision) if (x.type == :grazer && x.age >= 10) || (x.type == :copepod && x.age >= 19)] #only eating adult copepods and grazers
+        if isempty(hunt)
+            #move anywhere if no hunt nearby
+            set_target!(
+                stickleback,
+                random_walkable(model, model.pathfinder),
+                model.pathfinder
+            )
+            return
+        end
+        set_target!(stickleback, rand(model.rng, map(x -> x.pos, hunt)), model.pathfinder)
+    end
+    move_along_route!(stickleback, model, model.pathfinder)
+    if stickleback.infected == true
+        stickleback_eat!(stickleback, model)
+        stickleback.energy -= 1
+        move_along_route!(stickleback, model, model.pathfinder)
+    end
+end
+
 function copepod_eat!(copepod, model) #copepod eat around their general vicinity
     food = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :grazer]
     if !isempty(food)
@@ -384,7 +428,7 @@ function copepod_eat!(copepod, model) #copepod eat around their general vicinity
         # println("Eaten")
     end
 
-    infection = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :parasite]
+    infection = [x for x in nearby_agents(copepod, model) if x.type == :parasite]
     if !isempty(infection)
         #infection = rand(model.rng, parasite )
         kill_agent!(rand(model.rng, infection), model, model.pathfinder)
@@ -394,7 +438,7 @@ function copepod_eat!(copepod, model) #copepod eat around their general vicinity
 end
 
 function grazer_eat!(grazer, model)        
-    plankton = [x for x in nearby_agents(grazer, model, model.grazer_vision) if x.type == :phytoplankton]
+    plankton = [x for x in nearby_agents(grazer, model) if x.type == :phytoplankton]
     if !isempty(plankton)
         #plankton = rand(model.rng, phytoplankton)
         grazer.energy += grazer.Δenergy
@@ -513,13 +557,13 @@ fig, _ = abm_plot(model; plotkwargs...)
 fig
 
 grazer(a) = a.type == :grazer
-copepod(a) = a.type == :copepod
+stickleback(a) = a.type == :copepod
 copepodInf(a) = a.type == :copepod && a.infected == true
 parasite(a) = a.type == :parasite
 phytoplankton(a) = a.type == :phytoplankton
 
 n=25
-adata = [(grazer, count), (copepod, count), (parasite, count), (phytoplankton, count), (copepodInf, count)]
+adata = [(grazer, count), (stickleback, count), (parasite, count), (phytoplankton, count), (copepodInf, count)]
 adf = run!(model, model_step!, n; adata)
 
 #adf = adf[1]
