@@ -19,6 +19,7 @@
 #"The reductionist approach in ecology is relatively easy to apply if we assume that population members are either identical or that they differ only by sex and age." - include in title?
 #allagents(model)
 #has_empty_positions(model)
+#think about walk funciton
 
 
 using Random
@@ -29,10 +30,14 @@ using Distributions
 using InteractiveDynamics
 using CairoMakie
 using GLMakie
+using Images
+using FileIO
+using ImageMagick
+
 
 mutable struct CopepodGrazerParasitePhytoplankton <: AbstractAgent
     id::Int #Id of the Agent
-    pos::Dims{2} #position in the Space
+    pos::NTuple{2, Float64} #position in the Space
     type::Symbol # :Copepod or :Parasite or :Grazer or :Phytoplankton or :Stickleback
     energy::Float64 
     reproduction_prob::Float64  
@@ -68,7 +73,6 @@ end
 norm(vec) = √sum(vec .^ 2)
 
 function initialize_model(;
-    dims = (500,500),
     n_copepod = 500,
     n_phytoplankton = 500,
     n_grazer = 500, # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
@@ -95,21 +99,33 @@ function initialize_model(;
     grazer_size = 0.5,
     parasite_size = 0.1,
     stickleback_size = 3,
-    phytoplankton_age =0,
+    phytoplankton_age = 0,
     phytoplankton_energy = 0,
     copepod_mortality = 0.05,
     #grazer_mortality = 0.1,
     phytoplankton_mortality = 0.1,
     #stickleback_mortality = 0.2,
+    copepod_vel = 0.7,
+    grazer_vel = 0.5,
+    parasite_vel = 0.2,
+    stickleback_vel = 1,
     hatch_prob = 0.20, #probability for eggs to hatch, 20% as to Merles results (Parasite_eggs excel in Dropbox)
-    seed = 23182,    
+    seed = 23182,
+    dt = 0.1,    
     )
 
     rng = MersenneTwister(seed) #MersenneTwister: pseudo random number generator
-    space = GridSpace(dims, periodic = false)
+    space = ContinuousSpace((500., 500.); periodic = false)
+    heightmap_path = "C:\\Users\\Marvin\\OneDrive\\Dokumente\\GitHub\\HostParasite\\WhiteSpace.jpg"
+    heightmap = load(heightmap_path)
+    #heightmap_url = "https://github.com/MarvinKohnen/HostParasite/blob/2D-Beta/WhiteSpace.jpg"
+    #heightmap = load(download(heightmap_url))
+    dims = (size(heightmap))
+    water_walkmap= BitArray(falses(dims))
     
+
     properties = (
-        pathfinder = AStar(space; diagonal_movement = true),
+        pathfinder = AStar(space; walkmap = water_walkmap),
         Δenergy_copepod = Δenergy_copepod,
         Δenergy_grazer = Δenergy_grazer,
         Δenergy_parasite =Δenergy_parasite,
@@ -136,7 +152,12 @@ function initialize_model(;
         copepod_mortality = copepod_mortality,
         #grazer_mortality = grazer_mortality,
         phytoplankton_mortality = phytoplankton_mortality,
-        #stickleback_mortality = stickleback_mortality
+        #stickleback_mortality = stickleback_mortality,
+        copepod_vel = copepod_vel,
+        grazer_vel = grazer_vel,
+        parasite_vel = parasite_vel,
+        stickleback_vel = stickleback_vel,
+        dt = dt,
     )
     
     model = ABM(CopepodGrazerParasitePhytoplankton, space; properties, rng, scheduler = Schedulers.randomly)
@@ -145,7 +166,7 @@ function initialize_model(;
         add_agent_pos!(
             Copepod(
                 nextid(model),
-                random_walkable(model, model.pathfinder),
+                random_walkable(random_position(model), model, model.pathfinder, model.copepod_vision),
                 rand(1:(Δenergy_copepod*1)) - 1,
                 copepod_reproduce,
                 Δenergy_copepod,
@@ -160,7 +181,7 @@ function initialize_model(;
         add_agent_pos!(
             Stickleback(
                 nextid(model),
-                random_walkable(model, model.pathfinder),
+                random_walkable(random_position(model),model, model.pathfinder, model.stickleback_vision),
                 stickleback_reproduce,
                 stickleback_size,
             ),
@@ -172,7 +193,7 @@ function initialize_model(;
         add_agent_pos!(
             Grazer(
                 nextid(model),
-                random_walkable(model, model.pathfinder),
+                random_walkable(random_position(model), model, model.pathfinder, model.grazer_vision),
                 rand(1:(Δenergy_grazer*1)) - 1,
                 grazer_reproduce,
                 Δenergy_grazer,
@@ -187,7 +208,7 @@ function initialize_model(;
         add_agent_pos!(
             Parasite(
                 nextid(model),
-                random_walkable(model, model.pathfinder),
+                random_walkable(random_position(model), model, model.pathfinder),
                 rand(1:(Δenergy_parasite*1)) - 1,
                 parasite_reproduce,
                 Δenergy_parasite,
@@ -230,11 +251,11 @@ end
 function phytoplankton_step!(phytoplankton, model)
     phytoplankton.age += 1
     if phytoplankton.age >= 48 #"a couple of days" e.g. 2 up to 23 days (https://acp.copernicus.org/articles/10/9295/2010/)??? 
-        kill_agent!(phytoplankton, model)
+        kill_agent!(phytoplankton, model, model.pathfinder)
         return
     end
     if rand(model.rng) < model.phytoplankton_mortality
-        kill_agent!(phytoplankton, model)
+        kill_agent!(phytoplankton, model, model.pathfinder)
         return
     end
     phytoplankton.energy += 1
@@ -256,7 +277,7 @@ end
 function grazer_step!(grazer, model) 
     grazer_eat!(grazer, model)
     grazer.age += 1
-    grazer.energy -= 1
+    grazer.energy -=model.dt
     if grazer.energy < 0
         kill_agent!(grazer, model, model.pathfinder)
         return
@@ -267,7 +288,7 @@ function grazer_step!(grazer, model)
         
     #end
     
-    if rand(model.rng) <= grazer.reproduction_prob
+    if rand(model.rng) <= grazer.reproduction_prob * model.dt
         grazer_reproduce!(grazer, model)
     end
         
@@ -292,7 +313,7 @@ function grazer_step!(grazer, model)
         end
         if all(direction .≈ 0.)
             #move anywhere
-            chosen_position = random_walkable(model, model.pathfinder)
+            chosen_position = random_walkable(grazer.pos, model, model.pathfinder, model.grazer_vision) 
         else
             #Normalize the resultant direction and get the ideal position to move it
             direction = direction ./norm(direction)
@@ -306,17 +327,17 @@ function grazer_step!(grazer, model)
     if is_stationary(grazer, model.pathfinder)
         set_target!(
             grazer,
-            random_walkable(model, model.pathfinder),
+            random_walkable(grazer.pos, model, model.pathfinder, model.grazer_vision),
             model.pathfinder
         )
     end
-    move_along_route!(grazer, model, model.pathfinder)  
+    move_along_route!(grazer, model, model.pathfinder, model.grazer_vel, model.dt)  
 end
  
 function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (parasties want to stay in that vicinity)
     copepod_eat!(copepod, model)  
     copepod.age += 1
-    copepod.energy -= 1
+    copepod.energy -= model.dt
     if copepod.energy < 0
         kill_agent!(copepod, model, model.pathfinder)
         return
@@ -325,28 +346,28 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
         kill_agent!(copepod, model)
         return
     end
-    if rand(model.rng) <= copepod.reproduction_prob 
+    if rand(model.rng) <= copepod.reproduction_prob * model.dt
         copepod_reproduce!(copepod, model)
     end
 
-    if is_stationary(copepod, model.pathfinder)
+    if is_stationary(copepod, model.pathfinder)  #ADD FLIGHT FROM Stickleback
         prey = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :grazer && x.age >= 10]
         if isempty(prey)
             #move anywhere if no prey nearby
             set_target!(
                 copepod,
-                random_walkable(model, model.pathfinder),
+                random_walkable(copepod.pos, model, model.pathfinder, model.copepod_vision),
                 model.pathfinder
             )
             return
         end
         set_target!(copepod, rand(model.rng, map(x -> x.pos, prey)), model.pathfinder)
     end
-    move_along_route!(copepod, model, model.pathfinder)
+    move_along_route!(copepod, model, model.pathfinder, model.copepod_vel, model.dt)
     if copepod.infected == true
         copepod_eat!(copepod, model)
-        copepod.energy -= 1
-        move_along_route!(copepod, model, model.pathfinder)
+        copepod.energy -= model.dt
+        move_along_route!(copepod, model, model.pathfinder, model.copepod_vel, model.dt)
     end
 end
 
@@ -364,14 +385,14 @@ function stickleback_step!(stickleback, model)
             #move anywhere if no hunt nearby
             set_target!(
                 stickleback,
-                random_walkable(model, model.pathfinder),
+                random_walkable(stickleback.pos, model, model.pathfinder, model.stickleback_vision),
                 model.pathfinder
             )
             return
         end
         set_target!(stickleback, rand(model.rng, map(x -> x.pos, hunt)), model.pathfinder)
     end
-    move_along_route!(stickleback, model, model.pathfinder)
+    move_along_route!(stickleback, model, model.pathfinder, model.stickleback_vel, model.dt)
 end
 
 function stickleback_eat!(stickleback, model)
@@ -468,7 +489,7 @@ function phytoplankton_reproduce!(phytoplankton, model)
         id = nextid(model)
         offspring = Phytoplankton(
             id,
-            random_walkable(model, model.pathfinder),
+            random_walkable(random_position(model),model, model.pathfinder),
             0,
             0,
         )
@@ -552,8 +573,8 @@ parasite(a) = a.type == :parasite
 phytoplankton(a) = a.type == :phytoplankton
 stickleback(a) = a.type == :stickleback
 
-n=25
-adata = [(grazer, count), (stickleback, count), (parasite, count), (phytoplankton, count), (copepodInf, count), (stickleback, count)]
+n=5
+adata = [(grazer, count), (parasite, count), (phytoplankton, count), (copepodInf, count), (stickleback, count)]
 adf = run!(model, model_step!, n; adata)
 
 #adf = adf[1]
