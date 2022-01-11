@@ -20,6 +20,10 @@
 #allagents(model)
 #has_empty_positions(model)
 #think about walk funciton
+#copepod eat phytoplankton before age 19.5 
+#age 1 day = 24 steps!! 
+#https://onlinelibrary.wiley.com/doi/epdf/10.1111/j.1461-0248.2006.00995.x
+
 
 
 using Random
@@ -74,9 +78,9 @@ norm(vec) = √sum(vec .^ 2)
 
 function initialize_model(;
     n_copepod = 500,
-    n_phytoplankton = 500,
-    n_grazer = 500, # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
-    n_parasite = 200, 
+    n_phytoplankton = 10000,
+    n_grazer = 1000, # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
+    n_parasite = 500, 
     n_stickleback = 20,
     #n_eggs = 200, #continuous stream of "newly introduced parasites"
     Δenergy_copepod = 96, #4 days
@@ -384,7 +388,7 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
                 cdirection = cdirection ./norm(direction)
                  #move to a random position in the general direction of away from predators and toward prey
                 cposition = copepod.pos .+ cdirection .* (model.copepod_vision / 2.)
-                chosen_position = random_walkable(cposition, model, model.pathfinder,model.copepod_vision / 2.)
+                chosen_position = random_walkable(cposition, model, model.pathfinder, model.copepod_vision / 2.)
             end
         set_target!(copepod, chosen_position, model.pathfinder)
         
@@ -605,14 +609,15 @@ fig, _ = abm_plot(model; plotkwargs...)
 fig
 
 grazer(a) = a.type == :grazer
-stickleback(a) = a.type == :copepod
+copepod(a) = a.type == :copepod
 copepodInf(a) = a.type == :copepod && a.infected == true
 parasite(a) = a.type == :parasite
 phytoplankton(a) = a.type == :phytoplankton
 stickleback(a) = a.type == :stickleback
+sticklebackInf(a) = a.type ==:stickleback && a.infected == true
 
-n=5
-adata = [(grazer, count), (parasite, count), (phytoplankton, count), (copepodInf, count), (stickleback, count)]
+n=24
+adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
 adf = run!(model, model_step!, n; adata)
 
 #adf = adf[1]
@@ -620,17 +625,17 @@ adf = run!(model, model_step!, n; adata)
 using Plots
 #plot(adf.count_copepod, adf.count_grazer)
 
-function plot_population_timeseries(adf)
-    figure = Figure(resolution = (600, 400))
-    ax = figure[1, 1] = Axis(figure; xlabel = "Step", ylabel = "Population")
-    grazerl = lines!(ax, adf.count_grazer, color = :yellow)
-    copepodl = lines!(ax, adf.count_copepod, color = :black)
-    parasitel = lines!(ax,  adf.count_parasite, color = :magenta)
-    phytoplanktonl = lines!(ax,  adf.count_phytoplankton, color = :green)
-    stickleback = lines!(ax, adf.count_stickleback, color = :blue)
-    figure[1, 2] = Legend(figure, [grazerl, copepodl, parasitel, phytoplanktonl], ["Grazers", "Copepods", "Parasites", "Phytoplankton"])
-    figure
-end
+# function plot_population_timeseries(adf)
+#     figure = Figure(resolution = (600, 400))
+#     ax = figure[1, 1] = Axis(figure; xlabel = "Step", ylabel = "Population")
+#     grazerl = lines!(ax, adf.count_grazer, color = :yellow)
+#     copepodl = lines!(ax, adf.count_copepod, color = :black)
+#     parasitel = lines!(ax,  adf.count_parasite, color = :magenta)
+#     phytoplanktonl = lines!(ax,  adf.count_phytoplankton, color = :green)
+#     stickleback = lines!(ax, adf.count_stickleback, color = :blue)
+#     figure[1, 2] = Legend(figure, [grazerl, copepodl, parasitel, phytoplanktonl], ["Grazers", "Copepods", "Parasites", "Phytoplankton"])
+#     figure
+# end
 
 #plot_population_timeseries(adf)
 
