@@ -324,7 +324,7 @@ function grazer_step!(grazer, model)
         set_target!(grazer, chosen_position, model.pathfinder)
     end 
 
-    if is_stationary(grazer, model.pathfinder)
+    if is_stationary(grazer, model.pathfinder) && isempty(predators)
         set_target!(
             grazer,
             random_walkable(grazer.pos, model, model.pathfinder, model.grazer_vision),
@@ -352,7 +352,43 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
 
     if is_stationary(copepod, model.pathfinder)  #ADD FLIGHT FROM Stickleback
         prey = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :grazer && x.age >= 10]
-        if isempty(prey)
+        cpredator = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :Stickleback]
+        if !isempty(cpredator) || !isempty(prey)
+            cdirection = (0., 0.)
+            caway_direction = []
+            for i in 1:length(predators)
+                if i == 1
+                    caway_direction = (copepod.pos .- cpredators[i]) 
+                else    
+                    caway_direction = caway_direction .- cpredators[i]
+                end
+            end
+            ctoward_direction = []
+            for i in 1:length(prey)
+                if i == 1
+                    ctoward_direction = (copepod.pos.+ prey[i])
+                else
+                    ctoward_direction = ctoward_direction .+ prey[i]
+                end
+
+            #direction away from predators
+            all(caway_direction .≈ 0.) && all(ctoward_direction .≈ 0.) && continue  #predator at our location -> move anywhere
+            cdirection = cdirection .+ ctoward_direction ./norm(ctoward_direction) ^2  .+ caway_direction ./norm(caway_direction) ^2  #set new direction, closer predators contribute more to direction 
+            end
+            
+            if all(cdirection .≈ 0.) #meaning the sticklebacks are on top of the copepod
+                #move anywhere
+                chosen_position = random_walkable(copepod.pos, model, model.pathfinder, model.copepod_vision) 
+            else
+                 #Normalize the resultant direction and get the ideal position to move it
+                cdirection = cdirection ./norm(direction)
+                 #move to a random position in the general direction of away from predators and toward prey
+                cposition = copepod.pos .+ cdirection .* (model.copepod_vision / 2.)
+                chosen_position = random_walkable(cposition, model, model.pathfinder,model.copepod_vision / 2.)
+            end
+        set_target!(copepod, chosen_position, model.pathfinder)
+        
+        if isempty(prey) && isempty(cpredator)
             #move anywhere if no prey nearby
             set_target!(
                 copepod,
@@ -361,7 +397,7 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
             )
             return
         end
-        set_target!(copepod, rand(model.rng, map(x -> x.pos, prey)), model.pathfinder)
+    end
     end
     move_along_route!(copepod, model, model.pathfinder, model.copepod_vel, model.dt)
     if copepod.infected == true
@@ -402,8 +438,8 @@ function stickleback_eat!(stickleback, model)
             if x.infected == true
                 stickleback.infected == true
             end
-        kill_agent!(rand(model.rng, chase), model, model.pathfinder)
         end
+        kill_agent!(rand(model.rng, chase), model, model.pathfinder)
     end
 end
 
@@ -430,6 +466,31 @@ function grazer_eat!(grazer, model)
     end
 end
 
+
+function grazer_reproduce!(grazer, model) 
+    if grazer.gender == 1 && grazer.age > 10
+       
+        grazer.energy /= 2
+        for _ in 1:(rand(Normal(72, 5)))
+            id = nextid(model)
+            offspring = CopepodGrazerParasitePhytoplankton(
+                id,
+                grazer.pos,
+                grazer.type,
+                grazer.energy,
+                grazer.reproduction_prob,
+                grazer.Δenergy,
+                :false,
+                0,
+                rand(1:2),
+                grazer.size
+            )
+        add_agent_pos!(offspring, model)
+        end
+    return
+    end
+end
+
 #Clutch size for Macrocyclops albidus: 72.0 
 # add time to grow up: mean time to maturity for Macrocyclops albidus: 19.5 days 
 function copepod_reproduce!(copepod, model) 
@@ -442,7 +503,7 @@ function copepod_reproduce!(copepod, model)
             id = nextid(model)
             offspring = CopepodGrazerParasitePhytoplankton(
                 id,
-                random_walkable(model, model.pathfinder),
+                copepod.pos,
                 copepod.type,
                 copepod.energy,
                 copepod.reproduction_prob,
@@ -450,7 +511,7 @@ function copepod_reproduce!(copepod, model)
                 :false,
                 0,
                 rand(1:2),
-                copepod.size,
+                copepod.size
             )
         add_agent_pos!(offspring, model)
         end
@@ -458,29 +519,6 @@ function copepod_reproduce!(copepod, model)
     end
 end
 
-function grazer_reproduce!(grazer, model) 
-    if grazer.gender == 1 && grazer.age > 10
-       
-        grazer.energy /= 2
-        for _ in 1:(rand(Normal(72, 5)))
-            id = nextid(model)
-            offspring = CopepodGrazerParasitePhytoplankton(
-                id,
-                random_walkable(model, model.pathfinder),
-                grazer.type,
-                grazer.energy,
-                grazer.reproduction_prob,
-                grazer.Δenergy,
-                :false,
-                0,
-                rand(1:2),
-                grazer.size,
-            )
-        add_agent_pos!(offspring, model)
-        end
-    return
-    end
-end
 
 function phytoplankton_reproduce!(phytoplankton, model) 
     if phytoplankton.age >= 10
@@ -512,7 +550,7 @@ function parasite_reproduce!(model)
                 :false,
                 0,
                 1,
-                parasite_size,
+                parasite_size
             )
         end
     add_agent!(eggs, model)
@@ -582,16 +620,17 @@ adf = run!(model, model_step!, n; adata)
 using Plots
 #plot(adf.count_copepod, adf.count_grazer)
 
-# function plot_population_timeseries(adf)
-#     figure = Figure(resolution = (600, 400))
-#     ax = figure[1, 1] = Axis(figure; xlabel = "Step", ylabel = "Population")
-#     grazerl = lines!(ax, adf.count_grazer, color = :yellow)
-#     copepodl = lines!(ax, adf.count_copepod, color = :black)
-#     parasitel = lines!(ax,  adf.count_parasite, color = :magenta)
-#     phytoplanktonl = lines!(ax,  adf.count_phytoplankton, color = :green)
-#     figure[1, 2] = Legend(figure, [grazerl, copepodl, parasitel, phytoplanktonl], ["Grazers", "Copepods", "Parasites", "Phytoplankton"])
-#     figure
-# end
+function plot_population_timeseries(adf)
+    figure = Figure(resolution = (600, 400))
+    ax = figure[1, 1] = Axis(figure; xlabel = "Step", ylabel = "Population")
+    grazerl = lines!(ax, adf.count_grazer, color = :yellow)
+    copepodl = lines!(ax, adf.count_copepod, color = :black)
+    parasitel = lines!(ax,  adf.count_parasite, color = :magenta)
+    phytoplanktonl = lines!(ax,  adf.count_phytoplankton, color = :green)
+    stickleback = lines!(ax, adf.count_stickleback, color = :blue)
+    figure[1, 2] = Legend(figure, [grazerl, copepodl, parasitel, phytoplanktonl], ["Grazers", "Copepods", "Parasites", "Phytoplankton"])
+    figure
+end
 
 #plot_population_timeseries(adf)
 
