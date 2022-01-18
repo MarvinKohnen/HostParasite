@@ -22,14 +22,14 @@
 #age 1 day = 24 steps!! 
 #https://onlinelibrary.wiley.com/doi/epdf/10.1111/j.1461-0248.2006.00995.x  :   independent mortality = death by parasite = 0.05 (p. 49)  
 
-
+#for grazer use d. dentifera 
 #Model specific values:
-#   1. Clutch size: M. albidus: 72       d. pallidus: 17.5     ; Grazer: see paper 5 ; Parasites 504-1694 see paper 7
+#   1. Clutch size: M. albidus: 72            ; Grazer: see paper ; Parasites 504-1694 see paper 7
 #   2. age at maturity : macrocyclops albidus: 19.5 days ; Grazer: see paper 3
-#   3. max Lifespan:  Copepods: See paper 1 ; Grazer: see paper 4 (could not open) or paper 5 ; Parasite 1-5 depending on temp (paper 6)
-#   4. lifespan without food: ??? 
-#   5. reproduction rate: d. pallidus: 1.46 d 0.15 SD (paper 2)  ; Grazer:  ?
-#   6. Numbers -> which data set was it again? Zoo Numbers?
+#   3. max Lifespan:  Copepods: 45 days (jaime); Grazer: d.dentifera 20 days ; Parasite 4-5 depending on temp (paper 6)
+#   4. lifespan without food: macrocyclops: 5 days  
+#   5. reproduction rate:  m. albidus : once every 7 days at 10 degrees   ; Grazer:  once every 2.5 days 
+#   6. Numbers -> use equal numbers 
 #   7. Vision radius: absolutely no data
 #   8. Velocity: absolutely no data
 
@@ -41,6 +41,9 @@
 #5. p. 103: https://www.researchgate.net/profile/B-K-Sharma/publication/338108307_Sharma_Sumita_and_Sharma_B_K_1998_Observations_on_the_longevity_instar_durations_fecundity_and_growth_in_Alonella_excisa_Fischer_Cladocera_Chydoridae_Indian_Journal_of_Animal_Sciences_68_101-104/links/5dff30a64585159aa490129b/Sharma-Sumita-and-Sharma-B-K-1998-Observations-on-the-longevity-instar-durations-fecundity-and-growth-in-Alonella-excisa-Fischer-Cladocera-Chydoridae-Indian-Journal-of-Animal-Sciences-68-101-104.pdf
 #6. p. 267: https://reader.elsevier.com/reader/sd/pii/S0014489411002815?token=7019A29B14322B0C2D554F79BC309CF9A86E57DC66A0A300A46654D8814B177160946E8151AB7365279B35134BE8F18D&originRegion=eu-west-1&originCreation=20220118120608
 #7: p. 1053: https://www.jstor.org/stable/3283228?seq=5#metadata_info_tab_contents
+#8: https://link.springer.com/content/pdf/10.1007/BF00006104.pdf
+#9 https://www.nature.com/articles/s41598-019-51705-9 for functional stuff and 5 eatings per day 
+
 using Random
 using Agents
 using Agents.Pathfinding
@@ -354,6 +357,8 @@ end
 function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (parasties want to stay in that vicinity)
     copepod_eat!(copepod, model)  
     copepod.age += 1
+    #if copepod.age % 24 == 0
+
     copepod.energy -= model.dt
     if copepod.energy < 0
         kill_agent!(copepod, model, model.pathfinder)
@@ -508,7 +513,7 @@ function grazer_reproduce!(grazer, model)
     end
 end
 
-#Clutch size for Macrocyclops albidus: 72.0 
+#Clutch size for Macrocyclops albidus: 92.0 at 10 degrees
 # add time to grow up: mean time to maturity for Macrocyclops albidus: 19.5 days 
 function copepod_reproduce!(copepod, model) 
     if copepod.type == :copepod && copepod.infected == true 
@@ -516,7 +521,7 @@ function copepod_reproduce!(copepod, model)
        
         copepod.energy /= 2
 
-        for _ in 1:(rand(Normal(72, 5))) #50% survive
+        for _ in 1:(rand(Normal(92, 11))) #50% survive
             id = nextid(model)
             offspring = CopepodGrazerParasitePhytoplankton(
                 id,
