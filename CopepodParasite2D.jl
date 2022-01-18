@@ -7,11 +7,9 @@
 #have copepods feed on phytoplankton? yes for early stages 
 #how to incorporate larval stages of copepod and grazers, give them a mortality as well? yes 50%
 #dont stack agents on top of each other in one position
-#limit amount of agents in general
-#sticklebacks lifespan much longer 
+#limit amount of agents in general 
 #90% loss of energy each trophic level; metabolic cost  
 #validation via ensemble run 
-#infected copepods dont escape sticklebacks !!! (3 scenarios: fleeing, not fleeing, actively searching for sticklebacks)
 #adding classes of death (dead by fish, dead by energy loss, dead by mortality) ???
 #fish are fastest
 #movement based on relative sizes 
@@ -22,10 +20,27 @@
 #think about walk funciton
 #copepod eat phytoplankton before age 19.5 
 #age 1 day = 24 steps!! 
-#https://onlinelibrary.wiley.com/doi/epdf/10.1111/j.1461-0248.2006.00995.x
+#https://onlinelibrary.wiley.com/doi/epdf/10.1111/j.1461-0248.2006.00995.x  :   independent mortality = death by parasite = 0.05 (p. 49)  
 
 
+#Model specific values:
+#   1. Clutch size: M. albidus: 72       d. pallidus: 17.5     ; Grazer: see paper 5 ; Parasites 504-1694 see paper 7
+#   2. age at maturity : macrocyclops albidus: 19.5 days ; Grazer: see paper 3
+#   3. max Lifespan:  Copepods: See paper 1 ; Grazer: see paper 4 (could not open) or paper 5 ; Parasite 1-5 depending on temp (paper 6)
+#   4. lifespan without food: ??? 
+#   5. reproduction rate: d. pallidus: 1.46 d 0.15 SD (paper 2)  ; Grazer:  ?
+#   6. Numbers -> which data set was it again? Zoo Numbers?
+#   7. Vision radius: absolutely no data
+#   8. Velocity: absolutely no data
 
+#papers: 
+#1. p. 346: https://reader.elsevier.com/reader/sd/pii/S0924796397000857?token=BDD92FD299CA569D5058AB729D2CE9429B1905261D75D3CC7176ECFC3EAD4FEE94B5B65E141F97EE5B48C0728F618017&originRegion=eu-west-1&originCreation=20220118110130
+#2. p. 827: https://academic.oup.com/plankt/article/9/5/821/1492634?login=true 
+#3. p. 81: https://onlinelibrary.wiley.com/doi/epdf/10.1111/j.1365-2427.1988.tb01719.x
+#4. https://www.journals.uchicago.edu/doi/abs/10.1899/0887-3593(2004)023%3C0806%3AGRAPDO%3E2.0.CO%3B2
+#5. p. 103: https://www.researchgate.net/profile/B-K-Sharma/publication/338108307_Sharma_Sumita_and_Sharma_B_K_1998_Observations_on_the_longevity_instar_durations_fecundity_and_growth_in_Alonella_excisa_Fischer_Cladocera_Chydoridae_Indian_Journal_of_Animal_Sciences_68_101-104/links/5dff30a64585159aa490129b/Sharma-Sumita-and-Sharma-B-K-1998-Observations-on-the-longevity-instar-durations-fecundity-and-growth-in-Alonella-excisa-Fischer-Cladocera-Chydoridae-Indian-Journal-of-Animal-Sciences-68-101-104.pdf
+#6. p. 267: https://reader.elsevier.com/reader/sd/pii/S0014489411002815?token=7019A29B14322B0C2D554F79BC309CF9A86E57DC66A0A300A46654D8814B177160946E8151AB7365279B35134BE8F18D&originRegion=eu-west-1&originCreation=20220118120608
+#7: p. 1053: https://www.jstor.org/stable/3283228?seq=5#metadata_info_tab_contents
 using Random
 using Agents
 using Agents.Pathfinding
@@ -51,7 +66,6 @@ mutable struct CopepodGrazerParasitePhytoplankton <: AbstractAgent
     gender::Int  # 1 = female , 2 = male
     size::Float64 #bigger copepods eat more Grazer and vice versa  
     # -> mean for Macrocyclops albidus: mean (+- SD) in mm: Females: 1.56 +- 0.097 ; males: 1.11 +- 0.093
-    # -> Chydoridae: use Alona rectangula, https://onlinelibrary.wiley.com/doi/epdf/10.1111/j.1365-2427.1988.tb01719.x Table 6
 end
 
 function Copepod(id, pos, energy, repr, Δe, age, size)
@@ -113,7 +127,7 @@ function initialize_model(;
     grazer_vel = 0.5,
     parasite_vel = 0.2,
     stickleback_vel = 1,
-    hatch_prob = 0.20, #probability for eggs to hatch, 20% as to Merles results (Parasite_eggs excel in Dropbox)
+    hatch_prob = 0.20, #probability for eggs to hatch, 20% as to Merles results (Parasite_eggs/hactching rates excel in Dropbox)
     seed = 23182,
     dt = 0.1,    
     )
@@ -126,7 +140,6 @@ function initialize_model(;
     #heightmap = load(download(heightmap_url))
     dims = (size(heightmap))
     water_walkmap= BitArray(falses(dims))
-    
 
     properties = (
         pathfinder = AStar(space; walkmap = water_walkmap),
@@ -354,13 +367,13 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
         copepod_reproduce!(copepod, model)
     end
 
-    if is_stationary(copepod, model.pathfinder)  #ADD FLIGHT FROM Stickleback
+    if is_stationary(copepod, model.pathfinder)  
         prey = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :grazer && x.age >= 10]
-        cpredator = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :Stickleback]
-        if !isempty(cpredator) || !isempty(prey)
+        cpredators = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :Stickleback]
+        if !isempty(cpredators) || !isempty(prey)
             cdirection = (0., 0.)
             caway_direction = []
-            for i in 1:length(predators)
+            for i in 1:length(cpredators)
                 if i == 1
                     caway_direction = (copepod.pos .- cpredators[i]) 
                 else    
@@ -370,7 +383,7 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
             ctoward_direction = []
             for i in 1:length(prey)
                 if i == 1
-                    ctoward_direction = (copepod.pos.+ prey[i])
+                    ctoward_direction = (copepod.pos .+ prey[i])
                 else
                     ctoward_direction = ctoward_direction .+ prey[i]
                 end
@@ -448,7 +461,7 @@ function stickleback_eat!(stickleback, model)
 end
 
 function copepod_eat!(copepod, model) #copepod eat around their general vicinity
-    food = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :grazer]
+    food = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :grazer || (x.type == :phytoplankton && copepod.age <= 20)]
     if !isempty(food)
         kill_agent!(rand(model.rng, food), model, model.pathfinder)
         copepod.energy += copepod.Δenergy
