@@ -24,14 +24,14 @@
 
 #for grazer use d. dentifera 
 #Model specific values:
-#   1. Clutch size: M. albidus: 72            ; Grazer: see paper ; Parasites 504-1694 see paper 7
-#   2. age at maturity : macrocyclops albidus: 19.5 days ; Grazer: see paper 3
-#   3. max Lifespan:  Copepods: 45 days (jaime); Grazer: d.dentifera 20 days ; Parasite 4-5 depending on temp (paper 6)
-#   4. lifespan without food: macrocyclops: 5 days  
-#   5. reproduction rate:  m. albidus : once every 7 days at 10 degrees   ; Grazer:  once every 2.5 days 
+#   1. Clutch size: M. albidus: 72            ; Grazer: see paper ; Parasites 504-1694 see paper 7                              
+#   2. age at maturity : macrocyclops albidus: 19.5 days ; Grazer: see paper 3                                                  done 
+#   3. max Lifespan:  Copepods: 45 days (jaime); Grazer: d.dentifera 20 days ; Parasite 4-5 depending on temp (paper 6)         done 
+#   4. lifespan without food: macrocyclops: 5 days                                                                              done
+#   5. reproduction rate:  m. albidus : once every 7 days at 10 degrees   ; Grazer:  once every 2.5 days                        done       
 #   6. Numbers -> use equal numbers 
 #   7. Vision radius: absolutely no data
-#   8. Velocity: absolutely no data
+#   8. Velocity: absolutely no data         
 
 #papers: 
 #1. p. 346: https://reader.elsevier.com/reader/sd/pii/S0924796397000857?token=BDD92FD299CA569D5058AB729D2CE9429B1905261D75D3CC7176ECFC3EAD4FEE94B5B65E141F97EE5B48C0728F618017&originRegion=eu-west-1&originCreation=20220118110130
@@ -65,7 +65,7 @@ mutable struct CopepodGrazerParasitePhytoplankton <: AbstractAgent
     reproduction_prob::Float64  
     Δenergy::Float64
     infected::Bool
-    age::Int  # 19.5 days for Macrocyclops albidus
+    age::Int  
     gender::Int  # 1 = female , 2 = male
     size::Float64 #bigger copepods eat more Grazer and vice versa  
     # -> mean for Macrocyclops albidus: mean (+- SD) in mm: Females: 1.56 +- 0.097 ; males: 1.11 +- 0.093
@@ -100,18 +100,18 @@ function initialize_model(;
     n_parasite = 500, 
     n_stickleback = 20,
     #n_eggs = 200, #continuous stream of "newly introduced parasites"
-    Δenergy_copepod = 96, #4 days
-    Δenergy_grazer = 96, #4 days
-    Δenergy_parasite = 24,# 2 days   
+    Δenergy_copepod = 120, #5 days
+    Δenergy_grazer = 72, #3 days
+    Δenergy_parasite = 96,# 4 days   
     #Δenergy_stickleback = 96,
     copepod_vision = 1,  # how far copepods can see grazer to hunt
     grazer_vision = 1,  # how far grazer see phytoplankton to feed on
-    parasite_vision = 0.5,  # how far parasites can see copepods to stay in their general vicinit
+    parasite_vision = 0.5,  # how far parasites can see copepods to stay in their general vicinity
     stickleback_vision = 3,
-    copepod_reproduce = 0.05, #changes if infected, see copepod_reproduce function
-    grazer_reproduce = 0.05, #are not infected -> steady reproduction rate
+    copepod_reproduce = 0.00595, 
+    grazer_reproduce = 0.01666, 
     parasite_reproduce = 0, 
-    stickleback_reproduce = 0.05,
+    stickleback_reproduce = 0.041, #once per day
     copepod_age = 0,
     grazer_age = 0,
     parasite_age = 0,
@@ -130,7 +130,7 @@ function initialize_model(;
     grazer_vel = 0.5,
     parasite_vel = 0.2,
     stickleback_vel = 1,
-    hatch_prob = 0.20, #probability for eggs to hatch, 20% as to Merles results (Parasite_eggs/hactching rates excel in Dropbox)
+    hatch_prob = 0.20, #probability for eggs to hatch, 20% as to Merles results (Parasite_eggs/hatching rates excel in Dropbox)
     seed = 23182,
     dt = 0.1,    
     )
@@ -254,10 +254,10 @@ function initialize_model(;
 end
     
 function model_step!(agent::CopepodGrazerParasitePhytoplankton, model)
-    if agent.type == :copepod 
-        copepod_step!(agent, model)
-    elseif agent.type == :grazer 
+    if agent.type == :grazer 
         grazer_step!(agent, model)
+    elseif agent.type == :copepod 
+        copepod_step!(agent, model)
     elseif agent.type == :parasite
         parasite_step!(agent, model)
     elseif agent.type == :stickleback
@@ -289,7 +289,7 @@ function parasite_step!(parasite, model) #in lab: 2 days max, copepod 4 days max
         return
     end
     for _ in rand(5:24)
-        walk!(parasite, rand, model)
+        walk!(parasite, rand, model, periodic = false)
     end
 end
 
@@ -297,6 +297,10 @@ end
 function grazer_step!(grazer, model) 
     grazer_eat!(grazer, model)
     grazer.age += 1
+    if grazer.age >= 480
+        kill_agent!(grazer, model, model.pathfinder)
+        return
+    end
     grazer.energy -=model.dt
     if grazer.energy < 0
         kill_agent!(grazer, model, model.pathfinder)
@@ -312,10 +316,7 @@ function grazer_step!(grazer, model)
         grazer_reproduce!(grazer, model)
     end
         
-    predators = [
-        x.pos for x in nearby_agents(grazer, model, model.grazer_vision) if 
-            x.type == :copepod || x.type == :stickleback
-    ]
+    predators = [x.pos for x in nearby_agents(grazer, model, model.grazer_vision) if x.type == :copepod || x.type == :stickleback]
 
     if !isempty(predators) && is_stationary(grazer, model.pathfinder)
         direction = (0., 0.)
@@ -354,11 +355,13 @@ function grazer_step!(grazer, model)
     move_along_route!(grazer, model, model.pathfinder, model.grazer_vel, model.dt)  
 end
  
-function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (parasties want to stay in that vicinity)
+function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (parasites want to stay in that vicinity)
     copepod_eat!(copepod, model)  
     copepod.age += 1
-    #if copepod.age % 24 == 0
-
+    if copepod.age >= 1080
+        kill_agent!(copepod, model, model.pathfinder)
+        return
+    end
     copepod.energy -= model.dt
     if copepod.energy < 0
         kill_agent!(copepod, model, model.pathfinder)
@@ -434,6 +437,7 @@ function stickleback_step!(stickleback, model)
     
     if (rand(model.rng) <= stickleback.reproduction_prob) && (stickleback.infected == true)
         parasite_reproduce!(model)
+        stickleback.infected = false
     end
 
     if is_stationary(stickleback, model.pathfinder)
@@ -458,7 +462,7 @@ function stickleback_eat!(stickleback, model)
     if !isempty(chase)
         for x in chase
             if x.infected == true
-                stickleback.infected == true
+                stickleback.infected = true
             end
         end
         kill_agent!(rand(model.rng, chase), model, model.pathfinder)
@@ -470,6 +474,7 @@ function copepod_eat!(copepod, model) #copepod eat around their general vicinity
     if !isempty(food)
         kill_agent!(rand(model.rng, food), model, model.pathfinder)
         copepod.energy += copepod.Δenergy
+        return
     end
 
     infection = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :parasite]
@@ -485,15 +490,16 @@ function grazer_eat!(grazer, model)
         #plankton = rand(model.rng, phytoplankton)
         grazer.energy += grazer.Δenergy
         kill_agent!(rand(model.rng, plankton), model, model.pathfinder)
+        return
     end
 end
 
 
 function grazer_reproduce!(grazer, model) 
-    if grazer.gender == 1 && grazer.age > 10
+    if grazer.gender == 1 && grazer.age > 168
        
         grazer.energy /= 2
-        for _ in 1:(rand(Normal(72, 5)))
+        for _ in 1:4
             id = nextid(model)
             offspring = CopepodGrazerParasitePhytoplankton(
                 id,
@@ -517,11 +523,11 @@ end
 # add time to grow up: mean time to maturity for Macrocyclops albidus: 19.5 days 
 function copepod_reproduce!(copepod, model) 
     if copepod.type == :copepod && copepod.infected == true 
-    elseif copepod.gender == 1 && copepod.age > 19
+    elseif copepod.gender == 1 && copepod.age > 468
        
         copepod.energy /= 2
 
-        for _ in 1:(rand(Normal(92, 11))) #50% survive
+        for _ in 1:(rand(Normal(72, 5))) #50% survive
             id = nextid(model)
             offspring = CopepodGrazerParasitePhytoplankton(
                 id,
