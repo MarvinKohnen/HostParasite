@@ -400,7 +400,7 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
             ctoward_direction = []
             for i in 1:length(prey)
                 if i == 1
-                    ctoward_direction = (copepod.pos .+ prey[i])
+                    ctoward_direction = (prey[i] .+ prey[i])
                 else
                     ctoward_direction = ctoward_direction .+ prey[i]
                 end
@@ -414,7 +414,7 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
             chosen_position = random_walkable(copepod.pos, model, model.pathfinder, model.copepod_vision) 
         else
             #Normalize the resultant direction and get the ideal position to move it
-            cdirection = cdirection ./norm(direction)
+            cdirection = cdirection ./norm(cdirection)
             #move to a random position in the general direction of away from predators and toward prey
             cposition = copepod.pos .+ cdirection .* (model.copepod_vision / 2.)
             chosen_position = random_walkable(cposition, model, model.pathfinder, model.copepod_vision / 2.)
@@ -479,7 +479,7 @@ end
 function copepod_eat!(copepod, model) 
     food = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :grazer || (x.type == :phytoplankton && copepod.age <= 480)]
     if !isempty(food)  
-        for _ in food 
+        for x in food 
             if x.type == :grazer  
                 copepod.fullness += 1 
             end
