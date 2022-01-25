@@ -378,8 +378,9 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
     if is_stationary(copepod, model.pathfinder)  
         prey = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :grazer && x.age >= 10]
         cpredators = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :Stickleback]
-        if !isempty(cpredators) || !isempty(prey)
-            cdirection = (0., 0.)
+        cdirection = (0., 0.)
+        caway_direction = []
+        if !isempty(cpredators) 
             caway_direction = []
             for i in 1:length(cpredators)
                 if i == 1
@@ -388,6 +389,10 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
                     caway_direction = caway_direction .- cpredators[i]
                 end
             end
+        end 
+        
+        ctoward_direction = []
+        if !isempty(prey)
             ctoward_direction = []
             for i in 1:length(prey)
                 if i == 1
@@ -395,22 +400,21 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
                 else
                     ctoward_direction = ctoward_direction .+ prey[i]
                 end
+            end 
+        end
 
-            #direction away from predators
-            all(caway_direction .≈ 0.) && all(ctoward_direction .≈ 0.) && continue  #predator at our location -> move anywhere
-            cdirection = cdirection .+ ctoward_direction ./norm(ctoward_direction) ^2  .+ caway_direction ./norm(caway_direction) ^2  #set new direction, closer predators contribute more to direction 
-            end
+        cdirection = cdirection .+ ctoward_direction ./norm(ctoward_direction) ^2  .+ caway_direction ./norm(caway_direction) ^2  #set new direction, closer predators contribute more to direction 
             
-            if all(cdirection .≈ 0.) #meaning the sticklebacks are on top of the copepod
-                #move anywhere
-                chosen_position = random_walkable(copepod.pos, model, model.pathfinder, model.copepod_vision) 
-            else
-                 #Normalize the resultant direction and get the ideal position to move it
-                cdirection = cdirection ./norm(direction)
-                 #move to a random position in the general direction of away from predators and toward prey
-                cposition = copepod.pos .+ cdirection .* (model.copepod_vision / 2.)
-                chosen_position = random_walkable(cposition, model, model.pathfinder, model.copepod_vision / 2.)
-            end
+        if all(caway_direction .≈ 0.) #meaning the sticklebacks are on top of the copepod
+            #move anywhere
+            chosen_position = random_walkable(copepod.pos, model, model.pathfinder, model.copepod_vision) 
+        else
+            #Normalize the resultant direction and get the ideal position to move it
+            cdirection = cdirection ./norm(direction)
+            #move to a random position in the general direction of away from predators and toward prey
+            cposition = copepod.pos .+ cdirection .* (model.copepod_vision / 2.)
+            chosen_position = random_walkable(cposition, model, model.pathfinder, model.copepod_vision / 2.)
+        end
         set_target!(copepod, chosen_position, model.pathfinder)
         
         if isempty(prey) && isempty(cpredator)
@@ -422,7 +426,6 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
             )
             return
         end
-    end
     end
     move_along_route!(copepod, model, model.pathfinder, model.copepod_vel, model.dt)
     if copepod.infected == true
@@ -527,7 +530,7 @@ function copepod_reproduce!(copepod, model)
        
         copepod.energy /= 2
 
-        for _ in 1:(rand(Normal(72, 5))) #50% survive
+        for _ in 1:(rand(Normal(92, 5))) 
             id = nextid(model)
             offspring = CopepodGrazerParasitePhytoplankton(
                 id,
@@ -565,9 +568,11 @@ function phytoplankton_reproduce!(phytoplankton, model)
 end
 
 function parasite_reproduce!(model)
-    for _ in 1:rand(1000:500000)
-        id = nextid(model)
+    dry_w = rand(Normal(150,50)) ./ 10000
+    epg = 39247 .* dry_w .- 47 
+    for _ in 1:epg
         if rand(model.rng) <= model.hatch_prob
+            id = nextid(model)
             eggs = CopepodGrazerParasitePhytoplankton(
                 id,
                 random_walkable(model, model.pathfinder),
@@ -580,8 +585,8 @@ function parasite_reproduce!(model)
                 1,
                 parasite_size
             )
+        add_agent!(eggs, model)
         end
-    add_agent!(eggs, model)
     end
 return
 end
