@@ -96,7 +96,7 @@ norm(vec) = √sum(vec .^ 2)
 function initialize_model(;
     n_copepod = 500,
     n_phytoplankton = 10000,
-    n_grazer = 1000, # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
+    n_grazer = 500, # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
     n_parasite = 500, 
     n_stickleback = 20,
     #n_eggs = 200, #continuous stream of "newly introduced parasites"
@@ -473,8 +473,19 @@ function stickleback_eat!(stickleback, model)
 end
 
 function copepod_eat!(copepod, model) #copepod eat around their general vicinity
+    
     food = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :grazer || (x.type == :phytoplankton && copepod.age <= 20)]
     if !isempty(food)
+        eaten = 0
+        for _ in food 
+            if x.type == :grazer  
+                eaten = eaten +=1 
+            end
+        end 
+        if copepod.age % 24 == 0 
+            eaten = 0
+        end 
+       
         kill_agent!(rand(model.rng, food), model, model.pathfinder)
         copepod.energy += copepod.Δenergy
         return
@@ -496,7 +507,6 @@ function grazer_eat!(grazer, model)
         return
     end
 end
-
 
 function grazer_reproduce!(grazer, model) 
     if grazer.gender == 1 && grazer.age > 168
