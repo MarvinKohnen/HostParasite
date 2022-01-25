@@ -67,28 +67,29 @@ mutable struct CopepodGrazerParasitePhytoplankton <: AbstractAgent
     infected::Bool
     age::Int  
     gender::Int  # 1 = female , 2 = male
-    size::Float64 #bigger copepods eat more Grazer and vice versa  
+    size::Float64 #bigger copepods eat more Grazer and vice versa 
+    fullness::Int 
     # -> mean for Macrocyclops albidus: mean (+- SD) in mm: Females: 1.56 +- 0.097 ; males: 1.11 +- 0.093
 end
 
-function Copepod(id, pos, energy, repr, Δe, age, size)
-    CopepodGrazerParasitePhytoplankton(id, pos, :copepod, energy, repr, Δe, :false, age, rand(1:2), size)
+function Copepod(id, pos, energy, repr, Δe, age, size, )
+    CopepodGrazerParasitePhytoplankton(id, pos, :copepod, energy, repr, Δe, :false, age, rand(1:2), size, 0)
 end
 
 function Parasite(id, pos, energy, repr, Δe, age, size)
-    CopepodGrazerParasitePhytoplankton(id, pos, :parasite, energy, repr, Δe,:false, age, 1, size)
+    CopepodGrazerParasitePhytoplankton(id, pos, :parasite, energy, repr, Δe,:false, age, 1, size, 0)
 end
     
 function Grazer(id, pos, energy, repr, Δe, age, size)
-    CopepodGrazerParasitePhytoplankton(id, pos, :grazer, energy, repr, Δe, :false, age, rand(1:2), size)
+    CopepodGrazerParasitePhytoplankton(id, pos, :grazer, energy, repr, Δe, :false, age, rand(1:2), size, 0)
 end
 
 function Phytoplankton(id, pos, energy, age)
-    CopepodGrazerParasitePhytoplankton(id, pos, :phytoplankton, energy, 0.0, 10, :false, age, 1, 0.01)
+    CopepodGrazerParasitePhytoplankton(id, pos, :phytoplankton, energy, 0.0, 10, :false, age, 1, 0.01, 0)
 end 
 
 function Stickleback(id, pos, repr, size)
-    CopepodGrazerParasitePhytoplankton(id, pos, :stickleback, 100, repr, 10, :false, 10, rand(1:2), size)
+    CopepodGrazerParasitePhytoplankton(id, pos, :stickleback, 100, repr, 10, :false, 10, rand(1:2), size, 0)
 end
 
 norm(vec) = √sum(vec .^ 2)
@@ -137,7 +138,8 @@ function initialize_model(;
 
     rng = MersenneTwister(seed) #MersenneTwister: pseudo random number generator
     space = ContinuousSpace((500., 500.); periodic = false)
-    heightmap_path = "C:\\Users\\Marvin\\OneDrive\\Dokumente\\GitHub\\HostParasite\\WhiteSpace.jpg"
+    #heightmap_path = "C:\\Users\\Marvin\\OneDrive\\Dokumente\\GitHub\\HostParasite\\WhiteSpace.jpg"
+    heightmap_path = "WhiteSpace.jpg"
     heightmap = load(heightmap_path)
     #heightmap_url = "https://github.com/MarvinKohnen/HostParasite/blob/2D-Beta/WhiteSpace.jpg"
     #heightmap = load(download(heightmap_url))
@@ -356,7 +358,9 @@ function grazer_step!(grazer, model)
 end
  
 function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (parasites want to stay in that vicinity)
-    copepod_eat!(copepod, model)  
+    if copepod.fullness < 9
+        copepod_eat!(copepod, model)  
+    end 
     copepod.age += 1
     if copepod.age >= 1080
         kill_agent!(copepod, model, model.pathfinder)
@@ -379,7 +383,7 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
         prey = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :grazer && x.age >= 10]
         cpredators = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :Stickleback]
         cdirection = (0., 0.)
-        caway_direction = []
+        caway_direction = [(0.,0.)]
         if !isempty(cpredators) 
             caway_direction = []
             for i in 1:length(cpredators)
@@ -391,7 +395,7 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
             end
         end 
         
-        ctoward_direction = []
+        ctoward_direction = [(0.,0.)]
         if !isempty(prey)
             ctoward_direction = []
             for i in 1:length(prey)
@@ -472,24 +476,23 @@ function stickleback_eat!(stickleback, model)
     end
 end
 
-function copepod_eat!(copepod, model) #copepod eat around their general vicinity
-    
-    food = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :grazer || (x.type == :phytoplankton && copepod.age <= 20)]
-    if !isempty(food)
-        eaten = 0
+function copepod_eat!(copepod, model) 
+    food = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :grazer || (x.type == :phytoplankton && copepod.age <= 480)]
+    if !isempty(food)  
         for _ in food 
             if x.type == :grazer  
-                eaten = eaten +=1 
+                copepod.fullness += 1 
             end
         end 
-        if copepod.age % 24 == 0 
-            eaten = 0
-        end 
-       
+        
         kill_agent!(rand(model.rng, food), model, model.pathfinder)
         copepod.energy += copepod.Δenergy
         return
     end
+
+    if copepod.age % 24 == 0 
+        copepod.fullness = 0
+    end 
 
     infection = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :parasite]
     if !isempty(infection)
@@ -524,7 +527,8 @@ function grazer_reproduce!(grazer, model)
                 :false,
                 0,
                 rand(1:2),
-                grazer.size
+                grazer.size,
+                0
             )
         add_agent_pos!(offspring, model)
         end
@@ -552,7 +556,8 @@ function copepod_reproduce!(copepod, model)
                 :false,
                 0,
                 rand(1:2),
-                copepod.size
+                copepod.size,
+                0
             )
         add_agent_pos!(offspring, model)
         end
@@ -593,7 +598,8 @@ function parasite_reproduce!(model)
                 :false,
                 0,
                 1,
-                parasite_size
+                parasite_size,
+                0
             )
         add_agent!(eggs, model)
         end
