@@ -72,7 +72,7 @@ mutable struct CopepodGrazerParasitePhytoplankton <: AbstractAgent
     # -> mean for Macrocyclops albidus: mean (+- SD) in mm: Females: 1.56 +- 0.097 ; males: 1.11 +- 0.093
 end
 
-function Copepod(id, pos, energy, repr, Δe, age, size, )
+function Copepod(id, pos, energy, repr, Δe, age, size)
     CopepodGrazerParasitePhytoplankton(id, pos, :copepod, energy, repr, Δe, :false, age, rand(1:2), size, 0)
 end
 
@@ -92,7 +92,7 @@ function Stickleback(id, pos, repr, size)
     CopepodGrazerParasitePhytoplankton(id, pos, :stickleback, 100, repr, 10, :false, 10, rand(1:2), size, 0)
 end
 
-norm(vec) = √sum(vec .^ 2)
+#norm(vec) = √sum(vec .^ 2)
 
 function initialize_model(;
     n_copepod = 500,
@@ -105,10 +105,10 @@ function initialize_model(;
     Δenergy_grazer = 72, #3 days
     Δenergy_parasite = 96,# 4 days   
     #Δenergy_stickleback = 96,
-    copepod_vision = 1,  # how far copepods can see grazer to hunt
-    grazer_vision = 1,  # how far grazer see phytoplankton to feed on
-    parasite_vision = 0.5,  # how far parasites can see copepods to stay in their general vicinity
-    stickleback_vision = 3,
+    copepod_vision = 0.5,  # how far copepods can see grazer to hunt
+    grazer_vision = 0.5,  # how far grazer see phytoplankton to feed on
+    parasite_vision = 0.1,  # how far parasites can see copepods to stay in their general vicinity
+    stickleback_vision = 2,
     copepod_reproduce = 0.00595, 
     grazer_reproduce = 0.01666, 
     parasite_reproduce = 0, 
@@ -137,7 +137,7 @@ function initialize_model(;
     )
 
     rng = MersenneTwister(seed) #MersenneTwister: pseudo random number generator
-    space = ContinuousSpace((500., 500.); periodic = false)
+    space = ContinuousSpace((500., 500.); periodic = true)
     #heightmap_path = "C:\\Users\\Marvin\\OneDrive\\Dokumente\\GitHub\\HostParasite\\WhiteSpace.jpg"
     heightmap_path = "WhiteSpace.jpg"
     heightmap = load(heightmap_path)
@@ -291,7 +291,7 @@ function parasite_step!(parasite, model) #in lab: 2 days max, copepod 4 days max
         return
     end
     for _ in rand(5:24)
-        walk!(parasite, rand, model, periodic = false)
+        walk!(parasite, rand, model; periodic = false)
     end
 end
 
@@ -380,10 +380,10 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
     end
 
     if is_stationary(copepod, model.pathfinder)  
-        prey = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :grazer && x.age >= 10]
-        cpredators = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :Stickleback]
+        prey = [x.pos for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :grazer && x.age >= 10]
+        cpredators = [x.pos for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :Stickleback]
         cdirection = (0., 0.)
-        caway_direction = [(0.,0.)]
+        caway_direction = (0.,0.)
         if !isempty(cpredators) 
             caway_direction = []
             for i in 1:length(cpredators)
@@ -395,19 +395,19 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
             end
         end 
         
-        ctoward_direction = [(0.,0.)]
+        ctoward_direction = (0.,0.)
         if !isempty(prey)
             ctoward_direction = []
             for i in 1:length(prey)
                 if i == 1
-                    ctoward_direction = (prey[i] .+ prey[i])
+                    ctoward_direction = (copepod.pos .+ prey[i])
                 else
                     ctoward_direction = ctoward_direction .+ prey[i]
                 end
             end 
         end
 
-        cdirection = cdirection .+ ctoward_direction ./norm(ctoward_direction) ^2  .+ caway_direction ./norm(caway_direction) ^2  #set new direction, closer predators contribute more to direction 
+        cdirection = cdirection .+ ctoward_direction .+ caway_direction   #set new direction 
             
         if all(caway_direction .≈ 0.) #meaning the sticklebacks are on top of the copepod
             #move anywhere
@@ -421,7 +421,7 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
         end
         set_target!(copepod, chosen_position, model.pathfinder)
         
-        if isempty(prey) && isempty(cpredator)
+        if isempty(prey) && isempty(cpredators)
             #move anywhere if no prey nearby
             set_target!(
                 copepod,
@@ -684,12 +684,12 @@ using Plots
 
 #plot_population_timeseries(adf)
 
-abm_video(
-    "HostParasiteModel.mp4",
-    model,
-    model_step!;
-    frames = 25, 
-    framerate = 8,
-    plotkwargs...,
-)
+#abm_video(
+#    "HostParasiteModel.mp4",
+ #   model,
+  #  model_step!;
+   # frames = 25, 
+    #framerate = 8,
+    #plotkwargs...,
+#)
 
