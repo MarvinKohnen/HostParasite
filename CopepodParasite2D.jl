@@ -92,7 +92,7 @@ function Stickleback(id, pos, repr, size)
     CopepodGrazerParasitePhytoplankton(id, pos, :stickleback, 100, repr, 10, :false, 10, rand(1:2), size, 0)
 end
 
-#norm(vec) = √sum(vec .^ 2)
+norm(vec) = √sum(vec .^ 2)
 
 function initialize_model(;
     n_copepod = 500,
@@ -407,7 +407,7 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
             end 
         end
 
-        cdirection = cdirection .+ ctoward_direction .+ caway_direction   #set new direction 
+        cdirection = cdirection .+ ctoward_direction ./ norm(ctoward_direction) .^2 .+ caway_direction ./ norm(caway_direction) .^2   #set new direction 
             
         if all(caway_direction .≈ 0.) #meaning the sticklebacks are on top of the copepod
             #move anywhere
@@ -462,6 +462,7 @@ function stickleback_step!(stickleback, model)
         set_target!(stickleback, rand(model.rng, map(x -> x.pos, hunt)), model.pathfinder)
     end
     move_along_route!(stickleback, model, model.pathfinder, model.stickleback_vel, model.dt)
+    move_along_route!(grazer, model, model.pathfinder, model.grazer_vel, model.dt) 
 end
 
 function stickleback_eat!(stickleback, model)
@@ -661,28 +662,29 @@ phytoplankton(a) = a.type == :phytoplankton
 stickleback(a) = a.type == :stickleback
 sticklebackInf(a) = a.type ==:stickleback && a.infected == true
 
-n=24
+n=6
 adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
 adf = run!(model, model_step!, n; adata)
-
 #adf = adf[1]
 
-using Plots
-#plot(adf.count_copepod, adf.count_grazer)
+#using Plots
+#plot(adf.count_copepod, adf.count_grazer, adf.count_parasite, adf.count_phytoplankton, adf.count_copepodInf, adf.count_stickleback, adf.count_sticklebackInf)
 
-# function plot_population_timeseries(adf)
-#     figure = Figure(resolution = (600, 400))
-#     ax = figure[1, 1] = Axis(figure; xlabel = "Step", ylabel = "Population")
-#     grazerl = lines!(ax, adf.count_grazer, color = :yellow)
-#     copepodl = lines!(ax, adf.count_copepod, color = :black)
-#     parasitel = lines!(ax,  adf.count_parasite, color = :magenta)
-#     phytoplanktonl = lines!(ax,  adf.count_phytoplankton, color = :green)
-#     stickleback = lines!(ax, adf.count_stickleback, color = :blue)
-#     figure[1, 2] = Legend(figure, [grazerl, copepodl, parasitel, phytoplanktonl], ["Grazers", "Copepods", "Parasites", "Phytoplankton"])
-#     figure
-# end
+function plot_population_timeseries(adf)
+    figure = Figure(resolution = (600, 600))
+    ax = figure[1, 1] = Axis(figure; xlabel="Step",ylabel = "Population")
+    grazerl = lines!(ax, adf.step, adf.count_grazer, color = :yellow)
+    copepodl = lines!(ax, adf.step, adf.count_copepod, color = :black)
+    parasitel = lines!(ax, adf.step, adf.count_parasite, color = :magenta)
+    phytoplanktonl = lines!(ax, adf.step, adf.count_phytoplankton, color = :green)
+    sticklebackl = lines!(ax, adf.step, adf.count_stickleback, color = :blue)
+    copepodInfl = lines!(ax, adf.step, adf.count_copepodInf, color = :red)
+    sticklebackInfl = lines!(ax, adf.step, adf.count_sticklebackInf, color = :orange)
+    figure[1, 2] = Legend(figure, [grazerl, copepodl, parasitel, phytoplanktonl, sticklebackl, copepodInfl, sticklebackInfl], ["Grazers", "Copepods", "Parasites", "Phytoplankton", "Stickleback", "CopepodInfected", "Stickleback Infected"])
+    figure
+end
 
-#plot_population_timeseries(adf)
+plot_population_timeseries(adf)
 
 #abm_video(
 #    "HostParasiteModel.mp4",
