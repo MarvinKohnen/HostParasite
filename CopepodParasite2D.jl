@@ -46,7 +46,8 @@
 
 
 #errors:
-#Stickleback not implemented for 
+#Stickleback not implemented for ContinuousSpace
+#Plotting
 
 using Random
 using Agents
