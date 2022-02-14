@@ -1,18 +1,12 @@
 #Energy transmission (0.75 from prey to predator) doesnt work, does it?
-#Parasite Introduction in model_step function doesnt work -> adding fish, if fish infected, doesnt reproduce, but if it gets infected it produces parasite eggs, also preys on grazers or zooplankton in general
 #Size? multiplicate vision radius with size?
-#numbers: merles data: some repetitions, almost equal distribution of copepod and grazer (just chydoridae and cyclopods)
 #mortality for copepods (simulate sticklebacks)
 #mortality for phytoplankton (simulate all other zooplankton)
 #have copepods feed on phytoplankton? yes for early stages 
-#how to incorporate larval stages of copepod and grazers, give them a mortality as well? yes 50%
 #dont stack agents on top of each other in one position
 #limit amount of agents in general 
 #90% loss of energy each trophic level; metabolic cost  
-#validation via ensemble run 
-#adding classes of death (dead by fish, dead by energy loss, dead by mortality) ???
-#fish are fastest
-#movement based on relative sizes 
+#adding classes of death (dead by fish, dead by energy loss, dead by mortality) 
 
 #"The reductionist approach in ecology is relatively easy to apply if we assume that population members are either identical or that they differ only by sex and age." - include in title?
 #allagents(model)
@@ -110,10 +104,10 @@ function initialize_model(;
     Δenergy_grazer = 72, #3 days
     Δenergy_parasite = 96,# 4 days   
     #Δenergy_stickleback = 96,
-    copepod_vision = 1,  # how far copepods can see grazer to hunt
-    grazer_vision = 1,  # how far grazer see phytoplankton to feed on
+    copepod_vision = 1.,  # how far copepods can see grazer to hunt
+    grazer_vision = 1.,  # how far grazer see phytoplankton to feed on
     parasite_vision = 0.1,  # how far parasites can see copepods to stay in their general vicinity
-    stickleback_vision = 2,
+    stickleback_vision = 2.,
     copepod_reproduce = 0.00595, 
     grazer_reproduce = 0.01666, 
     parasite_reproduce = 0, 
@@ -135,7 +129,7 @@ function initialize_model(;
     copepod_vel = 0.7,
     grazer_vel = 0.5,
     parasite_vel = 0.2,
-    stickleback_vel = 1,
+    stickleback_vel = 1.,
     hatch_prob = 0.20, #probability for eggs to hatch, 20% as to Merles results (Parasite_eggs/hatching rates excel in Dropbox)
     seed = 23182,
     dt = 0.1,    
@@ -341,15 +335,15 @@ function grazer_step!(grazer, model)
         end
         if all(direction .≈ 0.)
             #move anywhere
-            chosen_position = random_walkable(grazer.pos, model, model.pathfinder, model.grazer_vision) 
+            gchosen_position = random_walkable(grazer.pos, model, model.pathfinder, model.grazer_vision) 
         else
             #Normalize the resultant direction and get the ideal position to move it
             direction = direction ./norm(direction)
             #move to a random position in the general direction of away from predators
             position = grazer.pos .+ direction .* (model.grazer_vision / 2.)
-            chosen_position = random_walkable(position, model, model.pathfinder, model.grazer_vision / 2.)
+            gchosen_position = random_walkable(position, model, model.pathfinder, model.grazer_vision / 2.)
         end
-        set_target!(grazer, chosen_position, model.pathfinder)
+        set_target!(grazer, gchosen_position, model.pathfinder)
     end 
 
     if is_stationary(grazer, model.pathfinder) && isempty(predators)
@@ -420,7 +414,7 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
         else
             #Normalize the resultant direction and get the ideal position to move it
             cdirection = cdirection ./norm(cdirection)
-            #move to a random position in the general direction of away from predators and toward prey
+            #move to a random position in the general direction away from predators and toward prey
             cposition = copepod.pos .+ cdirection .* (model.copepod_vision / 2.)
             chosen_position = random_walkable(cposition, model, model.pathfinder, model.copepod_vision / 2.)
         end
@@ -453,10 +447,25 @@ function stickleback_step!(stickleback, model)
     end
 
     if is_stationary(stickleback, model.pathfinder)
-        hunt = [x for x in nearby_agents(stickleback, model, model.stickleback_vision) if (x.type == :grazer && x.age >= 10) || (x.type == :copepod && x.age >= 19)] #only eating adult copepods and grazers
-        
+        hunt = [x.pos for x in nearby_agents(stickleback, model, model.stickleback_vision) if (x.type == :grazer && x.age >= 10) || (x.type == :copepod && x.age >= 19)] #only eating adult copepods and grazers
+        sdirection = (0., 0.)
+        stoward_direction = (0.,0.)
+        if !isempty(hunt)
+            stoward_direction = []
+            for i in 1:length(prey)
+                if i == 1
+                    stoward_direction = (stickleback.pos .+ hunt[i])
+                else
+                    stoward_direction = stoward_direction .+ hunt[i]
+                end
+            end 
+        end
+        sdirection = sdirection .+ stoward_direction ./ norm(stoward_direction) .^2
+        sposition = stickleback.pos .+ sdirection .* (model.stickleback_vision / 2.)
+        schosen_position = random_walkable(sposition, model, model.pathfinder, model.stickleback_vision / 2.)
+        set_target!(stickleback, schosen_position, model.pathfinder)
         if isempty(hunt)
-            #move anywhere if no hunt nearby
+            #move anywhere if no prey nearby
             set_target!(
                 stickleback,
                 random_walkable(stickleback.pos, model, model.pathfinder, model.stickleback_vision),
@@ -464,10 +473,8 @@ function stickleback_step!(stickleback, model)
             )
             return
         end
-        set_target!(stickleback, rand(model.rng, map(x -> x.pos, hunt)), model.pathfinder)
     end
-    move_along_route!(stickleback, model, model.pathfinder, model.stickleback_vel, model.dt)
-    move_along_route!(grazer, model, model.pathfinder, model.grazer_vel, model.dt) 
+    move_along_route!(stickleback, model, model.pathfinder, model.stickleback_vel, model.dt) 
 end
 
 function stickleback_eat!(stickleback, model)
@@ -667,10 +674,10 @@ phytoplankton(a) = a.type == :phytoplankton
 stickleback(a) = a.type == :stickleback
 sticklebackInf(a) = a.type ==:stickleback && a.infected == true
 
-n=6
+n=5
 adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
 adf = run!(model, model_step!, n; adata)
-#adf = adf[1]
+adf = adf[1]
 
 #using Plots
 #plot(adf.count_copepod, adf.count_grazer, adf.count_parasite, adf.count_phytoplankton, adf.count_copepodInf, adf.count_stickleback, adf.count_sticklebackInf)
