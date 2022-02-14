@@ -44,6 +44,10 @@
 #8: https://link.springer.com/content/pdf/10.1007/BF00006104.pdf
 #9 https://www.nature.com/articles/s41598-019-51705-9 for functional stuff and 5 eatings per day 
 
+
+#errors:
+#Stickleback not implemented for 
+
 using Random
 using Agents
 using Agents.Pathfinding
@@ -342,7 +346,7 @@ function grazer_step!(grazer, model)
             direction = direction ./norm(direction)
             #move to a random position in the general direction of away from predators
             position = grazer.pos .+ direction .* (model.grazer_vision / 2.)
-            chosen_position = random_walkable(position, model, model.pathfinder,model.grazer_vision / 2.)
+            chosen_position = random_walkable(position, model, model.pathfinder, model.grazer_vision / 2.)
         end
         set_target!(grazer, chosen_position, model.pathfinder)
     end 
@@ -685,7 +689,6 @@ function plot_population_timeseries(adf)
 end
 
 plot_population_timeseries(adf)
-
 #abm_video(
 #    "HostParasiteModel.mp4",
  #   model,
