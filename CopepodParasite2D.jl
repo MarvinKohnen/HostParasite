@@ -105,8 +105,8 @@ function initialize_model(;
     Δenergy_grazer = 72, #3 days
     Δenergy_parasite = 96,# 4 days   
     #Δenergy_stickleback = 96,
-    copepod_vision = 0.5,  # how far copepods can see grazer to hunt
-    grazer_vision = 0.5,  # how far grazer see phytoplankton to feed on
+    copepod_vision = 1,  # how far copepods can see grazer to hunt
+    grazer_vision = 1,  # how far grazer see phytoplankton to feed on
     parasite_vision = 0.1,  # how far parasites can see copepods to stay in their general vicinity
     stickleback_vision = 2,
     copepod_reproduce = 0.00595, 
