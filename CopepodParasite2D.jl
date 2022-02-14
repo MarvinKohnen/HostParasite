@@ -352,6 +352,7 @@ function grazer_step!(grazer, model)
             random_walkable(grazer.pos, model, model.pathfinder, model.grazer_vision),
             model.pathfinder
         )
+        return
     end
     move_along_route!(grazer, model, model.pathfinder, model.grazer_vel, model.dt)  
 end
@@ -446,36 +447,41 @@ function stickleback_step!(stickleback, model)
         stickleback.infected = false
     end
 
-    if is_stationary(stickleback, model.pathfinder)
-        hunt = [x.pos for x in nearby_agents(stickleback, model, model.stickleback_vision) if (x.type == :grazer && x.age >= 10) || (x.type == :copepod && x.age >= 19)] #only eating adult copepods and grazers
+    hunt = [x.pos for x in nearby_agents(stickleback, model, model.stickleback_vision) if (x.type == :grazer && x.age >= 10) || (x.type == :copepod && x.age >= 19)] #only eating adult copepods and grazers
+        
+    if is_stationary(stickleback, model.pathfinder) && if !isempty(hunt)
         sdirection = (0., 0.)
-        stoward_direction = (0.,0.)
-        if !isempty(hunt)
-            stoward_direction = []
-            for i in 1:length(prey)
-                if i == 1
-                    stoward_direction = (stickleback.pos .+ hunt[i])
-                else
-                    stoward_direction = stoward_direction .+ hunt[i]
-                end
-            end 
+        stoward_direction = []
+        for i in 1:length(hunt)
+            if i == 1
+                stoward_direction = (stickleback.pos .+ hunt[i])
+            else
+                stoward_direction = stoward_direction .+ hunt[i]
+            end
+            sdirection = sdirection .+ stoward_direction ./ norm(stoward_direction) ^2
         end
-        sdirection = sdirection .+ stoward_direction ./ norm(stoward_direction) .^2
-        sposition = stickleback.pos .+ sdirection .* (model.stickleback_vision / 2.)
-        schosen_position = random_walkable(sposition, model, model.pathfinder, model.stickleback_vision / 2.)
+        if all(stoward_direction .≈ 0)
+            schosen_position = random_walkable(stickleback.pos, model, model.pathfinder, model.stickleback_vision)
+        else 
+            sdirection = sdirection ./ norm(sdirection)
+            sposition = stickleback.pos .+ sdirection .* (model.stickleback_vision / 2.)
+            schosen_position = random_walkable(sposition, model, model.pathfinder, model.stickleback_vision / 2.)
+        end
         set_target!(stickleback, schosen_position, model.pathfinder)
-        if isempty(hunt)
-            #move anywhere if no prey nearby
-            set_target!(
-                stickleback,
-                random_walkable(stickleback.pos, model, model.pathfinder, model.stickleback_vision),
-                model.pathfinder
-            )
-            return
-        end
+    end
+
+    if is_stationary(stickleback, model.pathfinder) && isempty(hunt)
+        set_target!(
+            stickleback,
+            random_walkable(stickleback.pos, model, model.pathfinder, model.stickleback_vision),
+            model.pathfinder
+        )
+        return
     end
     move_along_route!(stickleback, model, model.pathfinder, model.stickleback_vel, model.dt) 
 end
+end 
+
 
 function stickleback_eat!(stickleback, model)
     chase = [x for x in nearby_agents(stickleback, model, model.stickleback_vision) if x.type == :copepod || x.type == :grazer]
