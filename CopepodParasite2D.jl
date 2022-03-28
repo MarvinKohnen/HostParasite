@@ -512,8 +512,10 @@ function copepod_eat!(copepod, model)
 
     infection = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :parasite]
     if !isempty(infection)
-        kill_agent!(rand(model.rng, infection), model, model.pathfinder)
-        copepod.infected = true
+        for infect in infection
+            kill_agent!(rand(model.rng, infect), model, model.pathfinder)
+            copepod.infected = true
+        end
     end
 end
 
