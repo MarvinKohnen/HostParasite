@@ -446,10 +446,10 @@ function stickleback_step!(stickleback, model)
         parasite_reproduce!(model)
         stickleback.infected = false
     end
-
+    
     hunt = [x.pos for x in nearby_agents(stickleback, model, model.stickleback_vision) if (x.type == :grazer && x.age >= 10) || (x.type == :copepod && x.age >= 19)] #only eating adult copepods and grazers
-        
-    if is_stationary(stickleback, model.pathfinder) && if !isempty(hunt)
+
+    if is_stationary(stickleback, model.pathfinder) && !isempty(hunt)
         sdirection = (0., 0.)
         stoward_direction = []
         for i in 1:length(hunt)
@@ -460,13 +460,10 @@ function stickleback_step!(stickleback, model)
             end
             sdirection = sdirection .+ stoward_direction ./ norm(stoward_direction) ^2
         end
-        if all(stoward_direction .≈ 0)
-            schosen_position = random_walkable(stickleback.pos, model, model.pathfinder, model.stickleback_vision)
-        else 
-            sdirection = sdirection ./ norm(sdirection)
-            sposition = stickleback.pos .+ sdirection .* (model.stickleback_vision / 2.)
-            schosen_position = random_walkable(sposition, model, model.pathfinder, model.stickleback_vision / 2.)
-        end
+        
+        sdirection = sdirection ./ norm(sdirection)
+        sposition = stickleback.pos .+ sdirection .* (model.stickleback_vision / 2.)
+        schosen_position = random_walkable(sposition, model, model.pathfinder, model.stickleback_vision / 2.)
         set_target!(stickleback, schosen_position, model.pathfinder)
     end
 
@@ -480,7 +477,7 @@ function stickleback_step!(stickleback, model)
     end
     move_along_route!(stickleback, model, model.pathfinder, model.stickleback_vel, model.dt) 
 end
-end 
+
 
 
 function stickleback_eat!(stickleback, model)
@@ -688,21 +685,21 @@ adf = adf[1]
 #using Plots
 #plot(adf.count_copepod, adf.count_grazer, adf.count_parasite, adf.count_phytoplankton, adf.count_copepodInf, adf.count_stickleback, adf.count_sticklebackInf)
 
-function plot_population_timeseries(adf)
-    figure = Figure(resolution = (600, 600))
-    ax = figure[1, 1] = Axis(figure; xlabel="Step",ylabel = "Population")
-    grazerl = lines!(ax, adf.step, adf.count_grazer, color = :yellow)
-    copepodl = lines!(ax, adf.step, adf.count_copepod, color = :black)
-    parasitel = lines!(ax, adf.step, adf.count_parasite, color = :magenta)
-    phytoplanktonl = lines!(ax, adf.step, adf.count_phytoplankton, color = :green)
-    sticklebackl = lines!(ax, adf.step, adf.count_stickleback, color = :blue)
-    copepodInfl = lines!(ax, adf.step, adf.count_copepodInf, color = :red)
-    sticklebackInfl = lines!(ax, adf.step, adf.count_sticklebackInf, color = :orange)
-    figure[1, 2] = Legend(figure, [grazerl, copepodl, parasitel, phytoplanktonl, sticklebackl, copepodInfl, sticklebackInfl], ["Grazers", "Copepods", "Parasites", "Phytoplankton", "Stickleback", "CopepodInfected", "Stickleback Infected"])
-    figure
-end
+#function plot_population_timeseries(adf)
+ #   figure = Figure(resolution = (600, 600))
+ #   ax = figure[1, 1] = Axis(figure; xlabel="Step",ylabel = "Population")
+ #   grazerl = lines!(ax, adf.step, adf.count_grazer, color = :yellow)
+ #   copepodl = lines!(ax, adf.step, adf.count_copepod, color = :black)
+ #   parasitel = lines!(ax, adf.step, adf.count_parasite, color = :magenta)
+ #   phytoplanktonl = lines!(ax, adf.step, adf.count_phytoplankton, color = :green)
+ #   sticklebackl = lines!(ax, adf.step, adf.count_stickleback, color = :blue)
+ #   copepodInfl = lines!(ax, adf.step, adf.count_copepodInf, color = :red)
+ #   sticklebackInfl = lines!(ax, adf.step, adf.count_sticklebackInf, color = :orange)
+ #   figure[1, 2] = Legend(figure, [grazerl, copepodl, parasitel, phytoplanktonl, sticklebackl, copepodInfl, sticklebackInfl], ["Grazers", "Copepods", "Parasites", "Phytoplankton", "Stickleback", "CopepodInfected", "Stickleback Infected"])
+ #   figure
+#end
 
-plot_population_timeseries(adf)
+#plot_population_timeseries(adf)
 #abm_video(
 #    "HostParasiteModel.mp4",
  #   model,
