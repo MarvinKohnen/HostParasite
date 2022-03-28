@@ -1,4 +1,6 @@
-#Energy transmission (0.75 from prey to predator) doesnt work, does it?
+#Return functionality check
+#Trophic cascades: energy loss and provision from agents to higher trophic levels
+
 #Size? multiplicate vision radius with size?
 #mortality for copepods (simulate sticklebacks)
 #mortality for phytoplankton (simulate all other zooplankton)
@@ -96,20 +98,20 @@ norm(vec) = √sum(vec .^ 2)
 function initialize_model(;
     n_copepod = 500,
     n_phytoplankton = 10000,
-    n_grazer = 500, # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
-    n_parasite = 500, 
-    n_stickleback = 20,
+    n_grazer = 1000, # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
+    n_parasite = 5000, 
+    n_stickleback = 30,
     #n_eggs = 200, #continuous stream of "newly introduced parasites"
     Δenergy_copepod = 120, #5 days
     Δenergy_grazer = 72, #3 days
     Δenergy_parasite = 96,# 4 days   
     #Δenergy_stickleback = 96,
-    copepod_vision = 1.,  # how far copepods can see grazer to hunt
-    grazer_vision = 1.,  # how far grazer see phytoplankton to feed on
-    parasite_vision = 0.1,  # how far parasites can see copepods to stay in their general vicinity
-    stickleback_vision = 2.,
+    copepod_vision = 0.05,  # how far copepods can see grazer to hunt
+    grazer_vision = 0.05,  # how far grazer see phytoplankton to feed on
+    parasite_vision = 0.005,  # how far parasites can see copepods to stay in their general vicinity
+    stickleback_vision = 0.5,
     copepod_reproduce = 0.00595, 
-    grazer_reproduce = 0.01666, 
+    grazer_reproduce = 0.01666,         
     parasite_reproduce = 0, 
     stickleback_reproduce = 0.041, #once per day
     copepod_age = 0,
@@ -124,7 +126,7 @@ function initialize_model(;
     phytoplankton_energy = 0,
     copepod_mortality = 0.05,
     #grazer_mortality = 0.1,
-    phytoplankton_mortality = 0.1,
+    phytoplankton_mortality = 0.01,
     #stickleback_mortality = 0.2,
     copepod_vel = 0.7,
     grazer_vel = 0.5,
@@ -136,7 +138,7 @@ function initialize_model(;
     )
 
     rng = MersenneTwister(seed) #MersenneTwister: pseudo random number generator
-    space = ContinuousSpace((500., 500.); periodic = true)
+    space = ContinuousSpace((2000., 2000.); periodic = true)
     #heightmap_path = "C:\\Users\\Marvin\\OneDrive\\Dokumente\\GitHub\\HostParasite\\WhiteSpace.jpg"
     heightmap_path = "WhiteSpace.jpg"
     heightmap = load(heightmap_path)
@@ -183,6 +185,21 @@ function initialize_model(;
     
     model = ABM(CopepodGrazerParasitePhytoplankton, space; properties, rng, scheduler = Schedulers.randomly)
     
+    for _ in 1:n_grazer
+        add_agent_pos!(
+            Grazer(
+                nextid(model),
+                random_walkable(random_position(model), model, model.pathfinder, model.grazer_vision),
+                rand(1:(Δenergy_grazer*1)) - 1,
+                grazer_reproduce,
+                Δenergy_grazer,
+                0,
+                grazer_size,
+            ),
+            model,
+        )
+    end
+
     for _ in 1:n_copepod
         add_agent_pos!(
             Copepod(
@@ -209,21 +226,7 @@ function initialize_model(;
             model,
         )
     end
-    
-    for _ in 1:n_grazer
-        add_agent_pos!(
-            Grazer(
-                nextid(model),
-                random_walkable(random_position(model), model, model.pathfinder, model.grazer_vision),
-                rand(1:(Δenergy_grazer*1)) - 1,
-                grazer_reproduce,
-                Δenergy_grazer,
-                0,
-                grazer_size,
-            ),
-            model,
-        )
-    end
+
     
     for _ in 1:n_parasite
         add_agent_pos!(
@@ -273,10 +276,12 @@ function phytoplankton_step!(phytoplankton, model)
     phytoplankton.age += 1
     if phytoplankton.age >= 48 #"a couple of days" e.g. 2 up to 23 days (https://acp.copernicus.org/articles/10/9295/2010/)??? 
         kill_agent!(phytoplankton, model, model.pathfinder)
+        print("phytoplankton dead by age")
         return
     end
     if rand(model.rng) < model.phytoplankton_mortality
         kill_agent!(phytoplankton, model, model.pathfinder)
+        print("phytoplankton dead by mortality")
         return
     end
     phytoplankton.energy += 1
@@ -487,23 +492,24 @@ function stickleback_eat!(stickleback, model)
             if x.infected == true
                 stickleback.infected = true
             end
+            kill_agent!(x, model, model.pathfinder)
         end
-        kill_agent!(rand(model.rng, chase), model, model.pathfinder)
     end
 end
 
 function copepod_eat!(copepod, model) 
-    food = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :grazer || (x.type == :phytoplankton && copepod.age <= 480)]
+    food = [x for x in nearby_agents(copepod, model, model.copepod_vision) if (x.type == :grazer && copepod.age >= 480) || (x.type == :phytoplankton && copepod.age <= 480)]
     if !isempty(food)  
         for x in food 
             if x.type == :grazer  
                 copepod.fullness += 1 
             end
-        end 
-        
-        kill_agent!(rand(model.rng, food), model, model.pathfinder)
+            if x.type == :phytoplankton
+                print("phytoplankton dead by copepod")
+            end
+        kill_agent!(x, model, model.pathfinder)
         copepod.energy += copepod.Δenergy
-        return
+        end
     end
 
     if copepod.age % 24 == 0 
@@ -512,8 +518,8 @@ function copepod_eat!(copepod, model)
 
     infection = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :parasite]
     if !isempty(infection)
-        for infect in infection
-            kill_agent!(rand(model.rng, infect), model, model.pathfinder)
+        for x in infection
+            kill_agent!(x, model, model.pathfinder)
             copepod.infected = true
         end
     end
@@ -525,6 +531,7 @@ function grazer_eat!(grazer, model)
         #plankton = rand(model.rng, phytoplankton)
         grazer.energy += grazer.Δenergy
         kill_agent!(rand(model.rng, plankton), model, model.pathfinder)
+        print("phytoplankton dead by grazer")
         return
     end
 end
@@ -585,7 +592,7 @@ end
 
 
 function phytoplankton_reproduce!(phytoplankton, model) 
-    if phytoplankton.age >= 10
+    if phytoplankton.age >= 10 
         phytoplankton.energy /= 2
 
         id = nextid(model)
@@ -604,20 +611,19 @@ function parasite_reproduce!(model)
     dry_w = rand(Normal(150,50)) ./ 10000
     epg = 39247 .* dry_w .- 47 
     for _ in 1:epg
+        Δenergy_parasite = 96
+        parasite_reproduce = 0
+        parasite_size = 0.1
         if rand(model.rng) <= model.hatch_prob
             id = nextid(model)
-            eggs = CopepodGrazerParasitePhytoplankton(
+            eggs = Parasite(
                 id,
-                random_walkable(model, model.pathfinder),
-                :parasite,
-                rand(1:(Δenergy_parasite))-1,
+                random_walkable(random_position(model), model, model.pathfinder),
+                rand(1:(Δenergy_parasite*1))-1,
                 parasite_reproduce,
                 Δenergy_parasite,
-                :false,
                 0,
-                1,
-                parasite_size,
-                0
+                parasite_size
             )
         add_agent!(eggs, model)
         end
