@@ -352,6 +352,7 @@ function grazer_step!(grazer, model)
             random_walkable(grazer.pos, model, model.pathfinder, model.grazer_vision),
             model.pathfinder
         )
+        return
     end
     move_along_route!(grazer, model, model.pathfinder, model.grazer_vel, model.dt)  
 end
@@ -445,37 +446,39 @@ function stickleback_step!(stickleback, model)
         parasite_reproduce!(model)
         stickleback.infected = false
     end
+    
+    hunt = [x.pos for x in nearby_agents(stickleback, model, model.stickleback_vision) if (x.type == :grazer && x.age >= 10) || (x.type == :copepod && x.age >= 19)] #only eating adult copepods and grazers
 
-    if is_stationary(stickleback, model.pathfinder)
-        hunt = [x.pos for x in nearby_agents(stickleback, model, model.stickleback_vision) if (x.type == :grazer && x.age >= 10) || (x.type == :copepod && x.age >= 19)] #only eating adult copepods and grazers
+    if is_stationary(stickleback, model.pathfinder) && !isempty(hunt)
         sdirection = (0., 0.)
-        stoward_direction = (0.,0.)
-        if !isempty(hunt)
-            stoward_direction = []
-            for i in 1:length(prey)
-                if i == 1
-                    stoward_direction = (stickleback.pos .+ hunt[i])
-                else
-                    stoward_direction = stoward_direction .+ hunt[i]
-                end
-            end 
+        stoward_direction = []
+        for i in 1:length(hunt)
+            if i == 1
+                stoward_direction = (stickleback.pos .+ hunt[i])
+            else
+                stoward_direction = stoward_direction .+ hunt[i]
+            end
+            sdirection = sdirection .+ stoward_direction ./ norm(stoward_direction) ^2
         end
-        sdirection = sdirection .+ stoward_direction ./ norm(stoward_direction) .^2
+        
+        sdirection = sdirection ./ norm(sdirection)
         sposition = stickleback.pos .+ sdirection .* (model.stickleback_vision / 2.)
         schosen_position = random_walkable(sposition, model, model.pathfinder, model.stickleback_vision / 2.)
         set_target!(stickleback, schosen_position, model.pathfinder)
-        if isempty(hunt)
-            #move anywhere if no prey nearby
-            set_target!(
-                stickleback,
-                random_walkable(stickleback.pos, model, model.pathfinder, model.stickleback_vision),
-                model.pathfinder
-            )
-            return
-        end
+    end
+
+    if is_stationary(stickleback, model.pathfinder) && isempty(hunt)
+        set_target!(
+            stickleback,
+            random_walkable(stickleback.pos, model, model.pathfinder, model.stickleback_vision),
+            model.pathfinder
+        )
+        return
     end
     move_along_route!(stickleback, model, model.pathfinder, model.stickleback_vel, model.dt) 
 end
+
+
 
 function stickleback_eat!(stickleback, model)
     chase = [x for x in nearby_agents(stickleback, model, model.stickleback_vision) if x.type == :copepod || x.type == :grazer]
@@ -509,8 +512,10 @@ function copepod_eat!(copepod, model)
 
     infection = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :parasite]
     if !isempty(infection)
-        kill_agent!(rand(model.rng, infection), model, model.pathfinder)
-        copepod.infected = true
+        for infect in infection
+            kill_agent!(rand(model.rng, infect), model, model.pathfinder)
+            copepod.infected = true
+        end
     end
 end
 
@@ -682,21 +687,21 @@ adf = adf[1]
 #using Plots
 #plot(adf.count_copepod, adf.count_grazer, adf.count_parasite, adf.count_phytoplankton, adf.count_copepodInf, adf.count_stickleback, adf.count_sticklebackInf)
 
-function plot_population_timeseries(adf)
-    figure = Figure(resolution = (600, 600))
-    ax = figure[1, 1] = Axis(figure; xlabel="Step",ylabel = "Population")
-    grazerl = lines!(ax, adf.step, adf.count_grazer, color = :yellow)
-    copepodl = lines!(ax, adf.step, adf.count_copepod, color = :black)
-    parasitel = lines!(ax, adf.step, adf.count_parasite, color = :magenta)
-    phytoplanktonl = lines!(ax, adf.step, adf.count_phytoplankton, color = :green)
-    sticklebackl = lines!(ax, adf.step, adf.count_stickleback, color = :blue)
-    copepodInfl = lines!(ax, adf.step, adf.count_copepodInf, color = :red)
-    sticklebackInfl = lines!(ax, adf.step, adf.count_sticklebackInf, color = :orange)
-    figure[1, 2] = Legend(figure, [grazerl, copepodl, parasitel, phytoplanktonl, sticklebackl, copepodInfl, sticklebackInfl], ["Grazers", "Copepods", "Parasites", "Phytoplankton", "Stickleback", "CopepodInfected", "Stickleback Infected"])
-    figure
-end
+#function plot_population_timeseries(adf)
+ #   figure = Figure(resolution = (600, 600))
+ #   ax = figure[1, 1] = Axis(figure; xlabel="Step",ylabel = "Population")
+ #   grazerl = lines!(ax, adf.step, adf.count_grazer, color = :yellow)
+ #   copepodl = lines!(ax, adf.step, adf.count_copepod, color = :black)
+ #   parasitel = lines!(ax, adf.step, adf.count_parasite, color = :magenta)
+ #   phytoplanktonl = lines!(ax, adf.step, adf.count_phytoplankton, color = :green)
+ #   sticklebackl = lines!(ax, adf.step, adf.count_stickleback, color = :blue)
+ #   copepodInfl = lines!(ax, adf.step, adf.count_copepodInf, color = :red)
+ #   sticklebackInfl = lines!(ax, adf.step, adf.count_sticklebackInf, color = :orange)
+ #   figure[1, 2] = Legend(figure, [grazerl, copepodl, parasitel, phytoplanktonl, sticklebackl, copepodInfl, sticklebackInfl], ["Grazers", "Copepods", "Parasites", "Phytoplankton", "Stickleback", "CopepodInfected", "Stickleback Infected"])
+ #   figure
+#end
 
-plot_population_timeseries(adf)
+#plot_population_timeseries(adf)
 #abm_video(
 #    "HostParasiteModel.mp4",
  #   model,
