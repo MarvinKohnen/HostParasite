@@ -138,7 +138,7 @@ function initialize_model(;
     rng = MersenneTwister(seed) #MersenneTwister: pseudo random number generator
     space = ContinuousSpace((500., 500.); periodic = true)
     #heightmap_path = "C:\\Users\\Marvin\\OneDrive\\Dokumente\\GitHub\\HostParasite\\WhiteSpace.jpg"
-    heightmap_path = "WhiteSpace.jpg"
+    heightmap_path = "/home/jaime/Dropbox/Projects_JM/Muenster/Marvin/project/HostParasite/HostParasite/WhiteSpace.jpg"
     heightmap = load(heightmap_path)
     #heightmap_url = "https://github.com/MarvinKohnen/HostParasite/blob/2D-Beta/WhiteSpace.jpg"
     #heightmap = load(download(heightmap_url))
