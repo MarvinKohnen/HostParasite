@@ -55,6 +55,7 @@ using FileIO
 using ImageMagick
 using DataFrames
 
+#cd("Dropbox/Jaime M/Projects_JM/Muenster/Marvin/project/HostParasite/HostParasite/")
 
 mutable struct CopepodGrazerParasitePhytoplankton <: AbstractAgent
     id::Int #Id of the Agent
@@ -136,7 +137,9 @@ function initialize_model(;
 
     rng = MersenneTwister(seed) #MersenneTwister: pseudo random number generator
     space = ContinuousSpace((2000., 2000.); periodic = true)
+
     heightmap_path = "WhiteSpace.jpg"
+
     heightmap = load(heightmap_path)
     dims = (size(heightmap))
     water_walkmap= BitArray(falses(dims))
@@ -666,8 +669,8 @@ plotkwargs = (
 
 model = initialize_model()
 
-fig, _ = abm_plot(model; plotkwargs...)
-fig
+#fig, _ = abm_plot(model; plotkwargs...)
+#fig
 
 grazer(a) = a.type == :grazer
 copepod(a) = a.type == :copepod
@@ -680,11 +683,26 @@ sticklebackInf(a) = a.type ==:stickleback && a.infected == true
 n=48
 adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
 adf = run!(model, model_step!, n; adata)
+
+model = initialize_model()
+
+n = 50
+adf = run!(model, model_step!, n; adata)
+
+
 adf = adf[1]
 show(adf, allrows=true)
 
-#using Plots
+
+using Plots
+
 #plot(adf.count_copepod, adf.count_grazer, adf.count_parasite, adf.count_phytoplankton, adf.count_copepodInf, adf.count_stickleback, adf.count_sticklebackInf)
+
+Plots.plot(adf.count_copepod, adf.step)
+Plots.plot!(adf.count_grazer, adf.step)
+Plots.plot!(adf.count_phytoplankton, adf.step)
+Plots.plot!(adf.count_stickleback, adf.step)
+
 
 #function plot_population_timeseries(adf)
  #   figure = Figure(resolution = (600, 600))
