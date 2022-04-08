@@ -1,21 +1,23 @@
-#Return functionality check
-#Trophic cascades: energy loss and provision from agents to higher trophic levels
+#Questions for Ali and Carlos
+# 1. Stepping: 1 day = 24 steps, dt = discrete timestep
+# 2. size of model (500 x 500 grid -> 250000 agents?)
+# 3. Return functionality check: when to use it
 
-#Size? multiplicate vision radius with size?
-#mortality for copepods (simulate sticklebacks)
-#mortality for phytoplankton (simulate all other zooplankton)
-#have copepods feed on phytoplankton? yes for early stages 
-#dont stack agents on top of each other in one position
-#limit amount of agents in general 
+# 4.a. dont stack agents on top of each other in one position
+# 4.b. limit amount of agents in general 
+# 5. how to load from a url 
+
+
+
+
+
+#Trophic cascades: energy loss and provision from agents to higher trophic levels
 #90% loss of energy each trophic level; metabolic cost  
 #adding classes of death (dead by fish, dead by energy loss, dead by mortality) 
 
 #"The reductionist approach in ecology is relatively easy to apply if we assume that population members are either identical or that they differ only by sex and age." - include in title?
-#allagents(model)
-#has_empty_positions(model)
-#think about walk funciton
-#copepod eat phytoplankton before age 19.5 
-#age 1 day = 24 steps!! 
+
+
 #https://onlinelibrary.wiley.com/doi/epdf/10.1111/j.1461-0248.2006.00995.x  :   independent mortality = death by parasite = 0.05 (p. 49)  
 
 #for grazer use d. dentifera 
@@ -40,11 +42,6 @@
 #8: https://link.springer.com/content/pdf/10.1007/BF00006104.pdf
 #9 https://www.nature.com/articles/s41598-019-51705-9 for functional stuff and 5 eatings per day 
 
-
-#errors:
-#Stickleback not implemented for ContinuousSpace
-#Plotting
-
 using Random
 using Agents
 using Agents.Pathfinding
@@ -56,6 +53,7 @@ using GLMakie
 using Images
 using FileIO
 using ImageMagick
+using DataFrames
 
 
 mutable struct CopepodGrazerParasitePhytoplankton <: AbstractAgent
@@ -95,13 +93,13 @@ end
 
 norm(vec) = √sum(vec .^ 2)
 
+
 function initialize_model(;
     n_copepod = 500,
     n_phytoplankton = 10000,
     n_grazer = 1000, # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
     n_parasite = 5000, 
     n_stickleback = 30,
-    #n_eggs = 200, #continuous stream of "newly introduced parasites"
     Δenergy_copepod = 120, #5 days
     Δenergy_grazer = 72, #3 days
     Δenergy_parasite = 96,# 4 days   
@@ -117,7 +115,6 @@ function initialize_model(;
     copepod_age = 0,
     grazer_age = 0,
     parasite_age = 0,
-    #stickleback_age =0,
     copepod_size = 1,
     grazer_size = 0.5,
     parasite_size = 0.1,
@@ -134,16 +131,13 @@ function initialize_model(;
     stickleback_vel = 1.,
     hatch_prob = 0.20, #probability for eggs to hatch, 20% as to Merles results (Parasite_eggs/hatching rates excel in Dropbox)
     seed = 23182,
-    dt = 0.1,    
+    dt = 0.1,
     )
 
     rng = MersenneTwister(seed) #MersenneTwister: pseudo random number generator
     space = ContinuousSpace((2000., 2000.); periodic = true)
-    #heightmap_path = "C:\\Users\\Marvin\\OneDrive\\Dokumente\\GitHub\\HostParasite\\WhiteSpace.jpg"
     heightmap_path = "WhiteSpace.jpg"
     heightmap = load(heightmap_path)
-    #heightmap_url = "https://github.com/MarvinKohnen/HostParasite/blob/2D-Beta/WhiteSpace.jpg"
-    #heightmap = load(download(heightmap_url))
     dims = (size(heightmap))
     water_walkmap= BitArray(falses(dims))
 
@@ -164,7 +158,6 @@ function initialize_model(;
         copepod_age = copepod_age,
         grazer_age = grazer_age,
         parasite_age = parasite_age,
-        #stickleback_age = stickleback_age,
         copepod_size = copepod_size,
         grazer_size = grazer_size,
         parasite_size = parasite_size,
@@ -276,12 +269,12 @@ function phytoplankton_step!(phytoplankton, model)
     phytoplankton.age += 1
     if phytoplankton.age >= 48 #"a couple of days" e.g. 2 up to 23 days (https://acp.copernicus.org/articles/10/9295/2010/)??? 
         kill_agent!(phytoplankton, model, model.pathfinder)
-        print("phytoplankton dead by age")
+        #print("phytoplankton dead by age")
         return
     end
     if rand(model.rng) < model.phytoplankton_mortality
         kill_agent!(phytoplankton, model, model.pathfinder)
-        print("phytoplankton dead by mortality")
+        #print("phytoplankton dead by mortality")
         return
     end
     phytoplankton.energy += 1
@@ -504,9 +497,9 @@ function copepod_eat!(copepod, model)
             if x.type == :grazer  
                 copepod.fullness += 1 
             end
-            if x.type == :phytoplankton
-                print("phytoplankton dead by copepod")
-            end
+            #if x.type == :phytoplankton
+                
+            #end
         kill_agent!(x, model, model.pathfinder)
         copepod.energy += copepod.Δenergy
         end
@@ -531,7 +524,6 @@ function grazer_eat!(grazer, model)
         #plankton = rand(model.rng, phytoplankton)
         grazer.energy += grazer.Δenergy
         kill_agent!(rand(model.rng, plankton), model, model.pathfinder)
-        print("phytoplankton dead by grazer")
         return
     end
 end
@@ -685,10 +677,11 @@ phytoplankton(a) = a.type == :phytoplankton
 stickleback(a) = a.type == :stickleback
 sticklebackInf(a) = a.type ==:stickleback && a.infected == true
 
-n=5
+n=48
 adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
 adf = run!(model, model_step!, n; adata)
 adf = adf[1]
+show(adf, allrows=true)
 
 #using Plots
 #plot(adf.count_copepod, adf.count_grazer, adf.count_parasite, adf.count_phytoplankton, adf.count_copepodInf, adf.count_stickleback, adf.count_sticklebackInf)
