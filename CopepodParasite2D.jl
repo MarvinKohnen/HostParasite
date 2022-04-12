@@ -103,8 +103,8 @@ function initialize_model(;
     Δenergy_grazer = 72, #3 days
     Δenergy_parasite = 96,# 4 days   
     #Δenergy_stickleback = 96,
-    copepod_vision = 3,  # how far copepods can see grazer to hunt
-    grazer_vision = 3,  # how far grazer see phytoplankton to feed on
+    copepod_vision = 1.5,  # how far copepods can see grazer to hunt
+    grazer_vision = 1.5,  # how far grazer see phytoplankton to feed on
     parasite_vision = 1,  # how far parasites can see copepods to stay in their general vicinity
     stickleback_vision = 5, # location to location in grid = 1 
     copepod_reproduce = 0.00595, 
@@ -127,7 +127,7 @@ function initialize_model(;
     copepod_vel = 0.7,
     grazer_vel = 0.5,
     parasite_vel = 0.2,
-    stickleback_vel = 1.,
+    stickleback_vel = 1.0,
     hatch_prob = 0.20, #probability for eggs to hatch, 20% as to Merles results (Parasite_eggs/hatching rates excel in Dropbox)
     seed = 23182,
     dt = 1.0,
@@ -187,7 +187,7 @@ function initialize_model(;
                 rand(1:(Δenergy_grazer*1)) - 1,
                 grazer_reproduce,
                 Δenergy_grazer,
-                rand(collect(1:480), 1)[1],
+                rand((1:480), 1)[1],
                 grazer_size,
             ),
             model,
@@ -202,7 +202,7 @@ function initialize_model(;
                 rand(1:(Δenergy_copepod*1)) - 1,
                 copepod_reproduce,
                 Δenergy_copepod,
-                rand(collect(1:1080),1)[1],
+                rand((1:1080),1)[1],
                 copepod_size,
             ),
             model,
