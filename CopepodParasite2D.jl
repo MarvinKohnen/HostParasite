@@ -1,11 +1,10 @@
 #Questions for Ali and Carlos
-# 1. Stepping: 1 day = 24 steps, dt = discrete timestep
+
 # 2. size of model (500 x 500 grid -> 250000 agents?)
-# 3. Return functionality check: when to use it
 
 # 4.a. dont stack agents on top of each other in one position
-# 4.b. limit amount of agents in general 
-# 5. how to load from a url 
+# solution: for moving agents "isempty param", else limit reproduction function 
+
 
 
 
@@ -50,7 +49,7 @@ using Distributions
 using InteractiveDynamics
 using CairoMakie
 using GLMakie
-using Images
+using Images #use for url load 
 using FileIO
 using ImageMagick
 using DataFrames
@@ -95,6 +94,7 @@ end
 norm(vec) = √sum(vec .^ 2)
 
 
+
 function initialize_model(;
     n_copepod = 500,
     n_phytoplankton = 10000,
@@ -105,10 +105,10 @@ function initialize_model(;
     Δenergy_grazer = 72, #3 days
     Δenergy_parasite = 96,# 4 days   
     #Δenergy_stickleback = 96,
-    copepod_vision = 0.05,  # how far copepods can see grazer to hunt
-    grazer_vision = 0.05,  # how far grazer see phytoplankton to feed on
-    parasite_vision = 0.005,  # how far parasites can see copepods to stay in their general vicinity
-    stickleback_vision = 0.5,
+    copepod_vision = 3,  # how far copepods can see grazer to hunt
+    grazer_vision = 20,  # how far grazer see phytoplankton to feed on
+    parasite_vision = 1,  # how far parasites can see copepods to stay in their general vicinity
+    stickleback_vision = 5, # location to location in grid = 1 
     copepod_reproduce = 0.00595, 
     grazer_reproduce = 0.01666,         
     parasite_reproduce = 0, 
@@ -132,7 +132,7 @@ function initialize_model(;
     stickleback_vel = 1.,
     hatch_prob = 0.20, #probability for eggs to hatch, 20% as to Merles results (Parasite_eggs/hatching rates excel in Dropbox)
     seed = 23182,
-    dt = 0.1,
+    dt = 1.0,
     )
 
     rng = MersenneTwister(seed) #MersenneTwister: pseudo random number generator
@@ -179,7 +179,7 @@ function initialize_model(;
         dt = dt,
     )
     
-    model = ABM(CopepodGrazerParasitePhytoplankton, space; properties, rng, scheduler = Schedulers.randomly)
+    model = ABM(CopepodGrazerParasitePhytoplankton, space; properties, rng, scheduler = Schedulers.randomly)  #Random Step order of agents! 
     
     for _ in 1:n_grazer
         add_agent_pos!(
@@ -253,7 +253,7 @@ function initialize_model(;
     return model
 end
     
-function model_step!(agent::CopepodGrazerParasitePhytoplankton, model)
+function agent_step!(agent::CopepodGrazerParasitePhytoplankton, model)  #agent
     if agent.type == :grazer 
         grazer_step!(agent, model)
     elseif agent.type == :copepod 
@@ -267,6 +267,16 @@ function model_step!(agent::CopepodGrazerParasitePhytoplankton, model)
     end
 end
 
+function model_step!(model)
+    for p in positions(model)
+        n = length(agents_in_position(p,model))
+        K = 10
+        if n>=K
+            ids = ids_in_position(p, model)
+            genocide!(model, rand(ids,(n-K)))
+        end
+    end
+end
 
 function phytoplankton_step!(phytoplankton, model)
     phytoplankton.age += 1
@@ -682,14 +692,7 @@ sticklebackInf(a) = a.type ==:stickleback && a.infected == true
 
 n=48
 adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
-adf = run!(model, model_step!, n; adata)
-
-model = initialize_model()
-
-n = 50
-adf = run!(model, model_step!, n; adata)
-
-
+adf = run!(model, agent_step!, model_step!, n; adata)
 adf = adf[1]
 show(adf, allrows=true)
 
@@ -704,27 +707,18 @@ Plots.plot!(adf.count_phytoplankton, adf.step)
 Plots.plot!(adf.count_stickleback, adf.step)
 
 
-#function plot_population_timeseries(adf)
- #   figure = Figure(resolution = (600, 600))
- #   ax = figure[1, 1] = Axis(figure; xlabel="Step",ylabel = "Population")
- #   grazerl = lines!(ax, adf.step, adf.count_grazer, color = :yellow)
- #   copepodl = lines!(ax, adf.step, adf.count_copepod, color = :black)
- #   parasitel = lines!(ax, adf.step, adf.count_parasite, color = :magenta)
- #   phytoplanktonl = lines!(ax, adf.step, adf.count_phytoplankton, color = :green)
- #   sticklebackl = lines!(ax, adf.step, adf.count_stickleback, color = :blue)
- #   copepodInfl = lines!(ax, adf.step, adf.count_copepodInf, color = :red)
- #   sticklebackInfl = lines!(ax, adf.step, adf.count_sticklebackInf, color = :orange)
- #   figure[1, 2] = Legend(figure, [grazerl, copepodl, parasitel, phytoplanktonl, sticklebackl, copepodInfl, sticklebackInfl], ["Grazers", "Copepods", "Parasites", "Phytoplankton", "Stickleback", "CopepodInfected", "Stickleback Infected"])
- #   figure
-#end
+#ensemblerun!
 
-#plot_population_timeseries(adf)
-#abm_video(
-#    "HostParasiteModel.mp4",
- #   model,
-  #  model_step!;
-   # frames = 25, 
-    #framerate = 8,
-    #plotkwargs...,
+#paramscan()
+
+#parameters = Dict(
+ #   :min_to_be_happy => collect(2:5), # expanded
+  #  :numagents => [200, 300],         # expanded
+   # :griddims => (20, 20),            # not Vector = not expanded
 #)
 
+#carrying capacity: amount of agents per node 
+#model_step!: runs after agents_step!, kills random agents above carrying capacity, sample
+#https://juliadynamics.github.io/Agents.jl/dev/api/#Agents.sample
+#global sensitivity -> ensemblerun  : https://github.com/SciML/GlobalSensitivity.jl
+#Salib py - sobol julia
