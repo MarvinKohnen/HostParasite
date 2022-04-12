@@ -93,8 +93,6 @@ end
 
 norm(vec) = √sum(vec .^ 2)
 
-
-
 function initialize_model(;
     n_copepod = 500,
     n_phytoplankton = 10000,
@@ -106,11 +104,11 @@ function initialize_model(;
     Δenergy_parasite = 96,# 4 days   
     #Δenergy_stickleback = 96,
     copepod_vision = 3,  # how far copepods can see grazer to hunt
-    grazer_vision = 20,  # how far grazer see phytoplankton to feed on
+    grazer_vision = 3,  # how far grazer see phytoplankton to feed on
     parasite_vision = 1,  # how far parasites can see copepods to stay in their general vicinity
     stickleback_vision = 5, # location to location in grid = 1 
     copepod_reproduce = 0.00595, 
-    grazer_reproduce = 0.01666,         
+    grazer_reproduce = 0.01666,
     parasite_reproduce = 0, 
     stickleback_reproduce = 0.041, #once per day
     copepod_age = 0,
@@ -189,7 +187,7 @@ function initialize_model(;
                 rand(1:(Δenergy_grazer*1)) - 1,
                 grazer_reproduce,
                 Δenergy_grazer,
-                0,
+                rand(collect(1:480), 1)[1],
                 grazer_size,
             ),
             model,
@@ -204,7 +202,7 @@ function initialize_model(;
                 rand(1:(Δenergy_copepod*1)) - 1,
                 copepod_reproduce,
                 Δenergy_copepod,
-                0,
+                rand(collect(1:1080),1)[1],
                 copepod_size,
             ),
             model,
@@ -267,16 +265,16 @@ function agent_step!(agent::CopepodGrazerParasitePhytoplankton, model)  #agent
     end
 end
 
-function model_step!(model)
-    for p in positions(model)
-        n = length(agents_in_position(p,model))
-        K = 10
-        if n>=K
-            ids = ids_in_position(p, model)
-            genocide!(model, rand(ids,(n-K)))
-        end
-    end
-end
+#function model_step!(model)
+ #   for p in positions(model)
+  #      n = length(agents_in_position(p,model))
+   #     K = 10
+    #    if n>=K
+     #       ids = ids_in_position(p, model)
+      #      genocide!(model, rand(ids,(n-K)))
+       # end
+    #end
+#end
 
 function phytoplankton_step!(phytoplankton, model)
     phytoplankton.age += 1
@@ -543,7 +541,7 @@ end
 
 function grazer_reproduce!(grazer, model) 
     if grazer.gender == 1 && grazer.age > 168
-       
+        
         grazer.energy /= 2
         for _ in 1:4
             id = nextid(model)
@@ -562,7 +560,7 @@ function grazer_reproduce!(grazer, model)
             )
         add_agent_pos!(offspring, model)
         end
-    return
+        return
     end
 end
 
@@ -692,7 +690,7 @@ sticklebackInf(a) = a.type ==:stickleback && a.infected == true
 
 n=48
 adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
-adf = run!(model, agent_step!, model_step!, n; adata)
+adf = run!(model, agent_step!, n; adata)
 adf = adf[1]
 show(adf, allrows=true)
 
