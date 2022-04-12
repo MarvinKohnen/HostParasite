@@ -103,8 +103,8 @@ function initialize_model(;
     Δenergy_grazer = 72, #3 days
     Δenergy_parasite = 96,# 4 days   
     #Δenergy_stickleback = 96,
-    copepod_vision = 3,  # how far copepods can see grazer to hunt
-    grazer_vision = 3,  # how far grazer see phytoplankton to feed on
+    copepod_vision = 1.5,  # how far copepods can see grazer to hunt
+    grazer_vision = 1.5,  # how far grazer see phytoplankton to feed on
     parasite_vision = 1,  # how far parasites can see copepods to stay in their general vicinity
     stickleback_vision = 5, # location to location in grid = 1 
     copepod_reproduce = 0.00595, 
@@ -127,7 +127,7 @@ function initialize_model(;
     copepod_vel = 0.7,
     grazer_vel = 0.5,
     parasite_vel = 0.2,
-    stickleback_vel = 1.,
+    stickleback_vel = 1.0,
     hatch_prob = 0.20, #probability for eggs to hatch, 20% as to Merles results (Parasite_eggs/hatching rates excel in Dropbox)
     seed = 23182,
     dt = 1.0,
@@ -187,7 +187,7 @@ function initialize_model(;
                 rand(1:(Δenergy_grazer*1)) - 1,
                 grazer_reproduce,
                 Δenergy_grazer,
-                rand(collect(1:480), 1)[1],
+                rand((1:480), 1)[1],
                 grazer_size,
             ),
             model,
@@ -202,7 +202,7 @@ function initialize_model(;
                 rand(1:(Δenergy_copepod*1)) - 1,
                 copepod_reproduce,
                 Δenergy_copepod,
-                rand(collect(1:1080),1)[1],
+                rand((1:1080),1)[1],
                 copepod_size,
             ),
             model,
@@ -252,21 +252,17 @@ function initialize_model(;
 end
     
 function agent_step!(agent::CopepodGrazerParasitePhytoplankton, model)  #agent
-
-    for i in 1:24
-        if agent.type == :grazer 
-            grazer_step!(agent, model)
-        elseif agent.type == :copepod 
-            copepod_step!(agent, model)
-        elseif agent.type == :parasite
-            parasite_step!(agent, model)
-        elseif agent.type == :stickleback
-            stickleback_step!(agent, model)
-        else 
-            phytoplankton_step!(agent, model)
-        end
+    if agent.type == :grazer 
+        grazer_step!(agent, model)
+    elseif agent.type == :copepod 
+        copepod_step!(agent, model)
+    elseif agent.type == :parasite
+        parasite_step!(agent, model)
+    elseif agent.type == :stickleback
+        stickleback_step!(agent, model)
+    else 
+        phytoplankton_step!(agent, model)
     end
-
 end
 
 #function model_step!(model)
@@ -638,6 +634,29 @@ function parasite_reproduce!(model)
 return
 end
 
+
+function model_step!(model)
+    agents = collect(allagents(model))
+    x1 = filter!(x -> x.type == :phytoplankton, agents)
+    ids = []
+
+    for i in 1:length(x1)
+        push!(ids, x1[i].id) 
+    end
+
+    n = length(ids) 
+    K =  1000000 # carrying capacity
+    if n > K
+        to_kill = rand(1:length(ids), n-K)
+
+        for j in 1:length(to_kill)
+            kill_agent!(x1[j], model)
+        end
+    end   
+
+end    
+
+
 function offset(a)
     a.type == :copepod ? (-0.7, -0.5) : (-0.3, -0.5)
 end
@@ -681,8 +700,6 @@ plotkwargs = (
 
 model = initialize_model()
 
-#fig, _ = abm_plot(model; plotkwargs...)
-#fig
 
 grazer(a) = a.type == :grazer
 copepod(a) = a.type == :copepod
@@ -692,9 +709,9 @@ phytoplankton(a) = a.type == :phytoplankton
 stickleback(a) = a.type == :stickleback
 sticklebackInf(a) = a.type ==:stickleback && a.infected == true
 
-n=48
+n=60
 adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
-adf = run!(model, agent_step!, n; adata)
+adf = run!(model, agent_step!, model_step!, n; adata)
 adf = adf[1]
 show(adf, allrows=true)
 
@@ -703,10 +720,10 @@ using Plots
 
 #plot(adf.count_copepod, adf.count_grazer, adf.count_parasite, adf.count_phytoplankton, adf.count_copepodInf, adf.count_stickleback, adf.count_sticklebackInf)
 
-Plots.plot(adf.count_copepod, adf.step)
-Plots.plot!(adf.count_grazer, adf.step)
-Plots.plot!(adf.count_phytoplankton, adf.step)
-Plots.plot!(adf.count_stickleback, adf.step)
+Plots.plot(adf.step, adf.count_copepod)
+Plots.plot!(adf.step, adf.count_grazer)
+Plots.plot!(adf.step, adf.count_phytoplankton)
+Plots.plot!(adf.step, adf.count_stickleback)
 
 
 #ensemblerun!
