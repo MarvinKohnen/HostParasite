@@ -605,8 +605,20 @@ function phytoplankton_reproduce!(phytoplankton, model)
             0,
             0,
         )
+    # reproduce phytoplankton by mitosis, cell division and killing the mo
     add_agent_pos!(offspring, model)
+    
+    id = nextid(model)
+    offspring = Phytoplankton(
+        id,
+        random_walkable(random_position(model),model, model.pathfinder),
+        0,
+        0,
+    )
+    add_agent_pos!(offspring, model)
+    kill_agent!(phytoplankton, model)
     return
+    
     end
 end
 
