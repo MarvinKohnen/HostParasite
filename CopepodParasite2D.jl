@@ -94,10 +94,10 @@ end
 norm(vec) = √sum(vec .^ 2)
 
 function initialize_model(;
-    n_copepod = 500,
-    n_phytoplankton = 10000,
+    n_copepod = 1000,
+    n_phytoplankton = 1000,
     n_grazer = 1000, # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
-    n_parasite = 5000, 
+    n_parasite = 1000, 
     n_stickleback = 30,
     Δenergy_copepod = 120, #5 days
     Δenergy_grazer = 72, #3 days
@@ -107,8 +107,8 @@ function initialize_model(;
     grazer_vision = 1.5,  # how far grazer see phytoplankton to feed on
     parasite_vision = 1,  # how far parasites can see copepods to stay in their general vicinity
     stickleback_vision = 5, # location to location in grid = 1 
-    copepod_reproduce = 0.00595, 
-    grazer_reproduce = 0.01666,
+    copepod_reproduce = (1/(24*17))*0.5,# 0.00595, 
+    grazer_reproduce = (1/(24*7))*0.8, #0.2,  #0.01666,
     parasite_reproduce = 0, 
     stickleback_reproduce = 0.041, #once per day
     copepod_age = 0,
@@ -120,15 +120,15 @@ function initialize_model(;
     stickleback_size = 3,
     phytoplankton_age = 0,
     phytoplankton_energy = 0,
-    copepod_mortality = 0.05,
+    copepod_mortality = (1/24) * 0.05,
     #grazer_mortality = 0.1,
-    phytoplankton_mortality = 0.01,
+    phytoplankton_mortality = (1/24)*0.01,
     #stickleback_mortality = 0.2,
     copepod_vel = 0.7,
     grazer_vel = 0.5,
     parasite_vel = 0.2,
     stickleback_vel = 1.0,
-    hatch_prob = 0.20, #probability for eggs to hatch, 20% as to Merles results (Parasite_eggs/hatching rates excel in Dropbox)
+    hatch_prob = 0.2, #probability for eggs to hatch, 20% as to Merles results (Parasite_eggs/hatching rates excel in Dropbox)
     seed = 23182,
     dt = 1.0,
     )
@@ -202,7 +202,7 @@ function initialize_model(;
                 rand(1:(Δenergy_copepod*1)) - 1,
                 copepod_reproduce,
                 Δenergy_copepod,
-                rand((1:1080),1)[1],
+                rand((1:(24*45)),1)[1],
                 copepod_size,
             ),
             model,
@@ -298,9 +298,9 @@ function parasite_step!(parasite, model) #in lab: 2 days max, copepod 4 days max
         kill_agent!(parasite, model, model.pathfinder)
         return
     end
-    for _ in rand(5:24)
-        walk!(parasite, rand, model; periodic = false)
-    end
+    #for _ in rand(5:24)
+    walk!(parasite, rand, model; periodic = false)
+    #end
 end
 
 
@@ -367,19 +367,7 @@ function grazer_step!(grazer, model)
 end
  
 function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (parasites want to stay in that vicinity)
-    if copepod.fullness < 9
-        copepod_eat!(copepod, model)  
-    end 
-    copepod.age += 1
-    if copepod.age >= 1080
-        kill_agent!(copepod, model, model.pathfinder)
-        return
-    end
-    copepod.energy -= model.dt
-    if copepod.energy < 0
-        kill_agent!(copepod, model, model.pathfinder)
-        return
-    end
+
     if rand(model.rng) < model.copepod_mortality
         kill_agent!(copepod, model)
         return
@@ -387,65 +375,82 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
     if rand(model.rng) <= copepod.reproduction_prob * model.dt
         copepod_reproduce!(copepod, model)
     end
+    copepod.age += 1
 
-    if is_stationary(copepod, model.pathfinder)  
-        prey = [x.pos for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :grazer && x.age >= 10]
-        cpredators = [x.pos for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :Stickleback]
-        cdirection = (0., 0.)
-        caway_direction = (0.,0.)
-        if !isempty(cpredators) 
-            caway_direction = []
-            for i in 1:length(cpredators)
-                if i == 1
-                    caway_direction = (copepod.pos .- cpredators[i]) 
-                else    
-                    caway_direction = caway_direction .- cpredators[i]
-                end
-            end
+
+
+        if copepod.fullness < 9
+            copepod_eat!(copepod, model)
         end 
-        
-        ctoward_direction = (0.,0.)
-        if !isempty(prey)
-            ctoward_direction = []
-            for i in 1:length(prey)
-                if i == 1
-                    ctoward_direction = (copepod.pos .+ prey[i])
-                else
-                    ctoward_direction = ctoward_direction .+ prey[i]
-                end
-            end 
-        end
 
-        cdirection = cdirection .+ ctoward_direction ./ norm(ctoward_direction) .^2 .+ caway_direction ./ norm(caway_direction) .^2   #set new direction 
-            
-        if all(caway_direction .≈ 0.) #meaning the sticklebacks are on top of the copepod
-            #move anywhere
-            chosen_position = random_walkable(copepod.pos, model, model.pathfinder, model.copepod_vision) 
-        else
-            #Normalize the resultant direction and get the ideal position to move it
-            cdirection = cdirection ./norm(cdirection)
-            #move to a random position in the general direction away from predators and toward prey
-            cposition = copepod.pos .+ cdirection .* (model.copepod_vision / 2.)
-            chosen_position = random_walkable(cposition, model, model.pathfinder, model.copepod_vision / 2.)
-        end
-        set_target!(copepod, chosen_position, model.pathfinder)
-        
-        if isempty(prey) && isempty(cpredators)
-            #move anywhere if no prey nearby
-            set_target!(
-                copepod,
-                random_walkable(copepod.pos, model, model.pathfinder, model.copepod_vision),
-                model.pathfinder
-            )
+        if copepod.age >= 19*24
+            kill_agent!(copepod, model, model.pathfinder)
             return
         end
-    end
-    move_along_route!(copepod, model, model.pathfinder, model.copepod_vel, model.dt)
-    if copepod.infected == true
-        copepod_eat!(copepod, model)
         copepod.energy -= model.dt
+        if copepod.energy < 0
+            kill_agent!(copepod, model, model.pathfinder)
+            return
+        end
+        
+        if is_stationary(copepod, model.pathfinder)  
+            prey = [x.pos for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :grazer && x.age >= 10]
+            cpredators = [x.pos for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :Stickleback]
+            cdirection = (0., 0.)
+            caway_direction = (0.,0.)
+            if !isempty(cpredators) 
+                caway_direction = []
+                for i in 1:length(cpredators)
+                    if i == 1
+                        caway_direction = (copepod.pos .- cpredators[i]) 
+                    else    
+                        caway_direction = caway_direction .- cpredators[i]
+                    end
+                end
+            end 
+            
+            ctoward_direction = (0.,0.)
+            if !isempty(prey)
+                ctoward_direction = []
+                for i in 1:length(prey)
+                    if i == 1
+                        ctoward_direction = (copepod.pos .+ prey[i])
+                    else
+                        ctoward_direction = ctoward_direction .+ prey[i]
+                    end
+                end 
+            end
+
+            cdirection = cdirection .+ ctoward_direction ./ norm(ctoward_direction) .^2 .+ caway_direction ./ norm(caway_direction) .^2   #set new direction 
+                
+            if all(caway_direction .≈ 0.) #meaning the sticklebacks are on top of the copepod
+                #move anywhere
+                chosen_position = random_walkable(copepod.pos, model, model.pathfinder, model.copepod_vision) 
+            else
+                #Normalize the resultant direction and get the ideal position to move it
+                cdirection = cdirection ./norm(cdirection)
+                #move to a random position in the general direction away from predators and toward prey
+                cposition = copepod.pos .+ cdirection .* (model.copepod_vision / 2.)
+                chosen_position = random_walkable(cposition, model, model.pathfinder, model.copepod_vision / 2.)
+            end
+            set_target!(copepod, chosen_position, model.pathfinder)
+            
+            if isempty(prey) && isempty(cpredators)
+                #move anywhere if no prey nearby
+                set_target!(
+                    copepod,
+                    random_walkable(copepod.pos, model, model.pathfinder, model.copepod_vision),
+                    model.pathfinder
+                )
+                return
+            end
+        end
         move_along_route!(copepod, model, model.pathfinder, model.copepod_vel, model.dt)
-    end
+        if copepod.infected == true
+            copepod_eat!(copepod, model)
+            copepod.energy -= model.dt
+            move_along_route!(copepod, model, model.pathfinder, model.copepod_vel, model.dt)
+        end
 end
 
 function stickleback_step!(stickleback, model) 
@@ -516,7 +521,7 @@ function copepod_eat!(copepod, model)
         end
     end
 
-    if copepod.age % 24 == 0 
+    if copepod.age % 1 == 0 
         copepod.fullness = 0
     end 
 
@@ -540,7 +545,7 @@ function grazer_eat!(grazer, model)
 end
 
 function grazer_reproduce!(grazer, model) 
-    if grazer.gender == 1 && grazer.age > 168
+    if grazer.gender == 1 && grazer.age > 2.5*24
         
         grazer.energy /= 2
         for _ in 1:4
@@ -568,7 +573,8 @@ end
 # add time to grow up: mean time to maturity for Macrocyclops albidus: 19.5 days 
 function copepod_reproduce!(copepod, model) 
     if copepod.type == :copepod && copepod.infected == true 
-    elseif copepod.gender == 1 && copepod.age > 468
+    
+    elseif copepod.gender == 1 && copepod.age > 19*24
        
         copepod.energy /= 2
 
@@ -595,7 +601,7 @@ end
 
 
 function phytoplankton_reproduce!(phytoplankton, model) 
-    if phytoplankton.age >= 10 
+    if phytoplankton.age >= 12
         phytoplankton.energy /= 2
 
         id = nextid(model)
@@ -657,7 +663,7 @@ function model_step!(model)
     end
 
     n = length(ids) 
-    K =  1000000 # carrying capacity
+    K =  500000 # carrying capacity
     if n > K
         to_kill = rand(1:length(ids), n-K)
 
@@ -710,7 +716,7 @@ plotkwargs = (
     offset = offset,
 )
 
-model = initialize_model()
+
 
 
 grazer(a) = a.type == :grazer
@@ -721,21 +727,31 @@ phytoplankton(a) = a.type == :phytoplankton
 stickleback(a) = a.type == :stickleback
 sticklebackInf(a) = a.type ==:stickleback && a.infected == true
 
-n=60
+n=24*20
+model = initialize_model()
 adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
 adf = run!(model, agent_step!, model_step!, n; adata)
 adf = adf[1]
 show(adf, allrows=true)
 
 
+# n=60
+# model = initialize_model()
+# adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
+# adf = run!(model, agent_step!, model_step!, n; adata)
+# adf = adf[1]
+# show(adf, allrows=true)
+
+
+
 using Plots
 
 #plot(adf.count_copepod, adf.count_grazer, adf.count_parasite, adf.count_phytoplankton, adf.count_copepodInf, adf.count_stickleback, adf.count_sticklebackInf)
 
-Plots.plot(adf.step, adf.count_copepod)
-Plots.plot!(adf.step, adf.count_grazer)
-Plots.plot!(adf.step, adf.count_phytoplankton)
-Plots.plot!(adf.step, adf.count_stickleback)
+Plots.plot(adf.step, adf.count_copepod, lab = "Copepods")
+Plots.plot!(adf.step, adf.count_grazer, lab = "Grazers")
+Plots.plot!(adf.step, adf.count_phytoplankton, lab = "Phytoplankton")
+Plots.plot!(adf.step, adf.count_stickleback, lab = "Fish")
 
 
 #ensemblerun!
