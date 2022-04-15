@@ -96,17 +96,17 @@ norm(vec) = √sum(vec .^ 2)
 function initialize_model(;
     n_copepod = 1000,
     n_phytoplankton = 1000,
-    n_grazer = 1000, # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
+    n_grazer = 200, # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
     n_parasite = 1000, 
     n_stickleback = 30,
-    Δenergy_copepod = 120, #5 days
-    Δenergy_grazer = 72, #3 days
+    Δenergy_copepod = 24*2, #5 days
+    Δenergy_grazer = 24*0.5, #1 days
     Δenergy_parasite = 96,# 4 days   
     #Δenergy_stickleback = 96,
-    copepod_vision = 1.5,  # how far copepods can see grazer to hunt
-    grazer_vision = 1.5,  # how far grazer see phytoplankton to feed on
+    copepod_vision = 1,  # how far copepods can see grazer to hunt
+    grazer_vision = 1,  # how far grazer see phytoplankton to feed on
     parasite_vision = 1,  # how far parasites can see copepods to stay in their general vicinity
-    stickleback_vision = 5, # location to location in grid = 1 
+    stickleback_vision = 1, # location to location in grid = 1 
     copepod_reproduce = (1/(24*17))*0.5,# 0.00595, 
     grazer_reproduce = (1/(24*7))*0.8, #0.2,  #0.01666,
     parasite_reproduce = 0, 
@@ -288,7 +288,7 @@ function phytoplankton_step!(phytoplankton, model)
         #print("phytoplankton dead by mortality")
         return
     end
-    phytoplankton.energy += 1
+    phytoplankton.energy += 3
     phytoplankton_reproduce!(phytoplankton, model)
 end
     
@@ -383,7 +383,7 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
             copepod_eat!(copepod, model)
         end 
 
-        if copepod.age >= 19*24
+        if copepod.age >= rand(15*24:19*24,1)[1] # copepods day between 15 and 19 days
             kill_agent!(copepod, model, model.pathfinder)
             return
         end
@@ -461,8 +461,8 @@ function stickleback_step!(stickleback, model)
         stickleback.infected = false
     end
     
-    hunt = [x.pos for x in nearby_agents(stickleback, model, model.stickleback_vision) if (x.type == :grazer && x.age >= 10) || (x.type == :copepod && x.age >= 19)] #only eating adult copepods and grazers
-
+#    hunt = [x.pos for x in nearby_agents(stickleback, model, model.stickleback_vision) if (x.type == :grazer && x.age >= 10) || (x.type == :copepod && x.age >= 19)] #only eating adult copepods and grazers
+    hunt = [x.pos for x in nearby_agents(stickleback, model, model.stickleback_vision) if  (x.type == :copepod && x.age >= 19*24)] #only eating adult copepods 
     if is_stationary(stickleback, model.pathfinder) && !isempty(hunt)
         sdirection = (0., 0.)
         stoward_direction = []
@@ -728,7 +728,7 @@ stickleback(a) = a.type == :stickleback
 sticklebackInf(a) = a.type ==:stickleback && a.infected == true
 
 n=24*20
-model = initialize_model()
+model = initialize_model(n_copepod = 0)
 adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
 adf = run!(model, agent_step!, model_step!, n; adata)
 adf = adf[1]
@@ -748,10 +748,12 @@ using Plots
 
 #plot(adf.count_copepod, adf.count_grazer, adf.count_parasite, adf.count_phytoplankton, adf.count_copepodInf, adf.count_stickleback, adf.count_sticklebackInf)
 
-Plots.plot(adf.step, adf.count_copepod, lab = "Copepods")
-Plots.plot!(adf.step, adf.count_grazer, lab = "Grazers")
-Plots.plot!(adf.step, adf.count_phytoplankton, lab = "Phytoplankton")
-Plots.plot!(adf.step, adf.count_stickleback, lab = "Fish")
+t = adf.step ./ 24
+Plots.plot( t, log10.(adf.count_copepod), lab = "Copepods")
+Plots.plot!(t, log10.(adf.count_grazer), lab = "Grazers")
+Plots.plot!(t, log10.(adf.count_phytoplankton), lab = "Phytoplankton")
+Plots.plot!(t, log10.(adf.count_stickleback), lab = "Fish")
+
 
 
 #ensemblerun!
