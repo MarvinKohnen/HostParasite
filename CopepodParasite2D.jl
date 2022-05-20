@@ -94,22 +94,23 @@ end
 norm(vec) = √sum(vec .^ 2)
 
 function initialize_model(;
-    n_copepod = 1000,
-    n_phytoplankton = 1000,
-    n_grazer = 200, # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
-    n_parasite = 1000, 
-    n_stickleback = 30,
-    Δenergy_copepod = 24*2, #5 days
-    Δenergy_grazer = 24*0.5, #1 days
-    Δenergy_parasite = 96,# 4 days   
+    n_copepod = 0, #100
+    n_phytoplankton = 100000, 
+    n_grazer = 200, #100 # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
+    n_parasite = 0, #1000
+    n_stickleback = 0,
+    Δenergy_copepod = 24*5, #5 days
+    Δenergy_grazer = 24, #1 days
+    Δenergy_parasite = 24*4,# 4 days   
     #Δenergy_stickleback = 96,
     copepod_vision = 1,  # how far copepods can see grazer to hunt
     grazer_vision = 1,  # how far grazer see phytoplankton to feed on
     parasite_vision = 1,  # how far parasites can see copepods to stay in their general vicinity
     stickleback_vision = 1, # location to location in grid = 1 
     copepod_reproduce = (1/(24*17))*0.5,# 0.00595, 
-    grazer_reproduce = (1/(24*7))*0.8, #0.2,  #0.01666,
+    grazer_reproduce = (1/(24)), #0.01666,
     parasite_reproduce = 0, 
+    phytoplankton_reproduce = (1/48),
     stickleback_reproduce = 0.041, #once per day
     copepod_age = 0,
     grazer_age = 0,
@@ -134,7 +135,7 @@ function initialize_model(;
     )
 
     rng = MersenneTwister(seed) #MersenneTwister: pseudo random number generator
-    space = ContinuousSpace((2000., 2000.); periodic = true)
+    space = ContinuousSpace((100., 100.); periodic = true)
 
     heightmap_path = "WhiteSpace.jpg"
 
@@ -156,6 +157,7 @@ function initialize_model(;
         grazer_reproduce = grazer_reproduce,
         parasite_reproduce = parasite_reproduce, 
         stickleback_reproduce = stickleback_reproduce,
+        phytoplankton_reproduce = phytoplankton_reproduce,
         copepod_age = copepod_age,
         grazer_age = grazer_age,
         parasite_age = parasite_age,
@@ -289,7 +291,9 @@ function phytoplankton_step!(phytoplankton, model)
         return
     end
     phytoplankton.energy += 3
-    phytoplankton_reproduce!(phytoplankton, model)
+    if rand(model.rng) <= model.phytoplankton_reproduce * model.dt
+        phytoplankton_reproduce!(phytoplankton, model)
+    end
 end
     
 function parasite_step!(parasite, model) #in lab: 2 days max, copepod 4 days max without food 
@@ -305,13 +309,16 @@ end
 
 
 function grazer_step!(grazer, model) 
-    grazer_eat!(grazer, model)
+    if grazer.energy <= 20
+        grazer_eat!(grazer, model)
+    end
     grazer.age += 1
-    if grazer.age >= 480
+    if grazer.age >= 20 * 24
         kill_agent!(grazer, model, model.pathfinder)
         return
     end
     grazer.energy -=model.dt
+
     if grazer.energy < 0
         kill_agent!(grazer, model, model.pathfinder)
         return
@@ -539,6 +546,7 @@ function grazer_eat!(grazer, model)
     if !isempty(plankton)
         #plankton = rand(model.rng, phytoplankton)
         grazer.energy += grazer.Δenergy
+        #println("$grazer.energy \n" )
         kill_agent!(rand(model.rng, plankton), model, model.pathfinder)
         return
     end
@@ -547,14 +555,14 @@ end
 function grazer_reproduce!(grazer, model) 
     if grazer.gender == 1 && grazer.age > 2.5*24
         
-        grazer.energy /= 2
-        for _ in 1:4
+        #grazer.energy /= 2
+        for _ in 1:rand(10:72)
             id = nextid(model)
             offspring = CopepodGrazerParasitePhytoplankton(
                 id,
                 grazer.pos,
                 grazer.type,
-                grazer.energy,
+                model.Δenergy_grazer,
                 grazer.reproduction_prob,
                 grazer.Δenergy,
                 :false,
@@ -611,20 +619,19 @@ function phytoplankton_reproduce!(phytoplankton, model)
             0,
             0,
         )
-    # reproduce phytoplankton by mitosis, cell division and killing the mo
-    add_agent_pos!(offspring, model)
+        # reproduce phytoplankton by mitosis, cell division and killing the mo
+        add_agent_pos!(offspring, model)
     
-    id = nextid(model)
-    offspring = Phytoplankton(
-        id,
-        random_walkable(random_position(model),model, model.pathfinder),
-        0,
-        0,
-    )
+        id = nextid(model)
+        offspring = Phytoplankton(
+            id,
+            random_walkable(random_position(model),model, model.pathfinder),
+            0,
+            0,
+        )
     add_agent_pos!(offspring, model)
     kill_agent!(phytoplankton, model)
     return
-    
     end
 end
 
@@ -663,7 +670,7 @@ function model_step!(model)
     end
 
     n = length(ids) 
-    K =  500000 # carrying capacity
+    K =  100000 # carrying capacity
     if n > K
         to_kill = rand(1:length(ids), n-K)
 
@@ -728,7 +735,7 @@ stickleback(a) = a.type == :stickleback
 sticklebackInf(a) = a.type ==:stickleback && a.infected == true
 
 n=24*20
-model = initialize_model(n_copepod = 0)
+model = initialize_model()
 adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
 adf = run!(model, agent_step!, model_step!, n; adata)
 adf = adf[1]
@@ -749,9 +756,9 @@ using Plots
 #plot(adf.count_copepod, adf.count_grazer, adf.count_parasite, adf.count_phytoplankton, adf.count_copepodInf, adf.count_stickleback, adf.count_sticklebackInf)
 
 t = adf.step ./ 24
-Plots.plot( t, log10.(adf.count_copepod), lab = "Copepods")
+Plots.plot(t, log10.(adf.count_phytoplankton), lab = "Phytoplankton")
+Plots.plot!(t, log10.(adf.count_copepod), lab = "Copepods")
 Plots.plot!(t, log10.(adf.count_grazer), lab = "Grazers")
-Plots.plot!(t, log10.(adf.count_phytoplankton), lab = "Phytoplankton")
 Plots.plot!(t, log10.(adf.count_stickleback), lab = "Fish")
 
 
