@@ -94,23 +94,23 @@ end
 norm(vec) = √sum(vec .^ 2)
 
 function initialize_model(;
-    n_copepod = 100, #100
-    n_phytoplankton = 5000, 
-    n_grazer = 200, #100 # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
+    n_copepod = 0, #100
+    n_phytoplankton = 100, 
+    n_grazer = 100, #100 # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
     n_parasite = 0, #1000
     n_stickleback = 0,
-    Δenergy_copepod = 24*5, #5 days
-    Δenergy_grazer = 24, #1 days
-    Δenergy_parasite = 24*4,# 4 days   
+    Δenergy_copepod = 5, #5 days
+    Δenergy_grazer = 20, #1 days
+    Δenergy_parasite = 5,# 4 days   
     #Δenergy_stickleback = 96,
     copepod_vision = 1,  # how far copepods can see grazer to hunt
     grazer_vision = 1,  # how far grazer see phytoplankton to feed on
     parasite_vision = 1,  # how far parasites can see copepods to stay in their general vicinity
     stickleback_vision = 1, # location to location in grid = 1 
-    copepod_reproduce = (1/(24)),#(1/(24*17))*0.5,# 0.00595, 
-    grazer_reproduce = (1/(24)), #0.01666,
-    parasite_reproduce = 0, 
-    phytoplankton_reproduce = (1/24),
+    copepod_reproduce = 0.01,#(1/(24*17))*0.5,# 0.00595, 
+    grazer_reproduce = 0.01, #0.01666,
+    parasite_reproduce = 0.01, 
+    phytoplankton_reproduce = 0.1,
     stickleback_reproduce = 0.041, #once per day
     copepod_age = 0,
     grazer_age = 0,
@@ -119,11 +119,11 @@ function initialize_model(;
     grazer_size = 1,
     parasite_size = 0.1,
     stickleback_size = 3,
-    phytoplankton_age = 0,
-    phytoplankton_energy = 0,
-    copepod_mortality = (1/24) * 0.05,
-    #grazer_mortality = 0.1,
-    phytoplankton_mortality = (1/24)*0.01,
+    phytoplankton_age = 2,
+    phytoplankton_energy = 2,
+    copepod_mortality = 0.01,
+    grazer_mortality = 0,
+    phytoplankton_mortality = 0.001,
     #stickleback_mortality = 0.2,
     copepod_vel = 0.5,
     grazer_vel = 0.5,
@@ -168,7 +168,7 @@ function initialize_model(;
         phytoplankton_energy = phytoplankton_energy,
         hatch_prob = hatch_prob,
         copepod_mortality = copepod_mortality,
-        #grazer_mortality = grazer_mortality,
+        grazer_mortality = grazer_mortality,
         phytoplankton_mortality = phytoplankton_mortality,
         #stickleback_mortality = stickleback_mortality,
         copepod_vel = copepod_vel,
@@ -188,8 +188,8 @@ function initialize_model(;
                 rand(1:(Δenergy_grazer*1)) - 1,
                 grazer_reproduce,
                 Δenergy_grazer,
-                rand((1:480), 1)[1],
-                grazer_size,
+                rand((1:20),1)[1],
+                grazer_size,    
             ),
             model,
         )
@@ -279,7 +279,8 @@ end
 
 function phytoplankton_step!(phytoplankton, model)
     phytoplankton.age += 1
-    if phytoplankton.age >= 48 #"a couple of days" e.g. 2 up to 23 days (https://acp.copernicus.org/articles/10/9295/2010/)??? 
+    phytoplankton.energy += 3
+    if phytoplankton.age >= 20 #"a couple of days" e.g. 2 up to 23 days (https://acp.copernicus.org/articles/10/9295/2010/)??? 
         kill_agent!(phytoplankton, model, model.pathfinder)
         #print("phytoplankton dead by age")
         return
@@ -289,7 +290,7 @@ function phytoplankton_step!(phytoplankton, model)
         #print("phytoplankton dead by mortality")
         return
     end
-    phytoplankton.energy += 3
+    
     if rand(model.rng) <= model.phytoplankton_reproduce * model.dt
         phytoplankton_reproduce!(phytoplankton, model)
     end
@@ -308,30 +309,44 @@ end
 
 
 function grazer_step!(grazer, model) 
-    if grazer.energy <= 20
+    grazer.age += 1
+
+    if grazer.energy < 10
         grazer_eat!(grazer, model)
     end
-    grazer.age += 1
-    if grazer.age >= 20 * 24
-        kill_agent!(grazer, model, model.pathfinder)
-        return
-    end
-    grazer.energy -=model.dt
-
-    if grazer.energy < 0
-        kill_agent!(grazer, model, model.pathfinder)
-        return
-    end
-    #if rand(model.rng) < model.grazer_mortality
-        #kill_agent!(grazer, model)
-        #return
-        
-    #end
     
-    if rand(model.rng) <= grazer.reproduction_prob * model.dt
-        grazer_reproduce!(grazer, model)
+    if grazer.age >=5 
+        if rand(model.rng) <= grazer.reproduction_prob * model.dt
+            grazer_reproduce!(grazer, model)
+        end
     end
+    
         
+    grazer.energy -= 1#model.dt
+
+
+
+    # if grazer.age >= 30
+    #     kill_agent!(grazer, model, model.pathfinder)
+    #     print("Kill by age ")
+    #     return
+    # end
+    
+
+    if grazer.energy < 0.5
+        kill_agent!(grazer, model, model.pathfinder)
+        return
+    end
+
+    if rand(model.rng) < model.grazer_mortality
+        kill_agent!(grazer, model)
+        #print("Gracer Kill by random mortality ")
+        return
+        
+    end
+    
+
+
     predators = [x.pos for x in nearby_agents(grazer, model, model.grazer_vision) if x.type == :copepod || x.type == :stickleback]
 
     if !isempty(predators) && is_stationary(grazer, model.pathfinder)
@@ -548,12 +563,13 @@ function grazer_eat!(grazer, model)
         grazer.energy += grazer.Δenergy
         #println("$grazer.energy \n" )
         kill_agent!(x, model, model.pathfinder)
+        #print("phytoplankton eaten")
         end
     end
 end
 
 function grazer_reproduce!(grazer, model) 
-    if grazer.gender == 1 && grazer.age > 2.5*24
+    if grazer.gender == 1 && grazer.age > 5
         
         #grazer.energy /= 2
         for _ in 1:rand(10:72)
@@ -734,7 +750,7 @@ phytoplankton(a) = a.type == :phytoplankton
 stickleback(a) = a.type == :stickleback
 sticklebackInf(a) = a.type ==:stickleback && a.infected == true
 
-n=24*20
+n=100
 model = initialize_model()
 adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
 adf = run!(model, agent_step!, model_step!, n; adata)
@@ -755,11 +771,12 @@ using Plots
 
 #plot(adf.count_copepod, adf.count_grazer, adf.count_parasite, adf.count_phytoplankton, adf.count_copepodInf, adf.count_stickleback, adf.count_sticklebackInf)
 
-t = adf.step ./ 24
-Plots.plot(t, (adf.count_phytoplankton), lab = "Phytoplankton")
-Plots.plot!(t, (adf.count_copepod), lab = "Copepods")
-Plots.plot!(t, (adf.count_grazer), lab = "Grazers")
-Plots.plot!(t, (adf.count_stickleback), lab = "Fish")
+t = adf.step #./ 24
+
+Plots.plot(t, log10.(adf.count_copepod), lab = "Copepods")
+Plots.plot!(t, log10.(adf.count_grazer), lab = "Grazers")
+Plots.plot!(t, log10.(adf.count_phytoplankton), lab = "Phytoplankton")
+Plots.plot!(t, log10.(adf.count_stickleback), lab = "Fish")
 
 
 
