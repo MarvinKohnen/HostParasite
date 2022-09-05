@@ -45,9 +45,9 @@ My_Logit(0.5)
     Δenergy::Float64
     Infection::Int64
     # infection_prob::Float64
-    α::Float64
-    σ::Float64
-    FR::Float64
+    α::Float64  # intercep feding rate
+    σ::Float64  # variance
+    FR::Float64 # feeding rate
 end
 
 
@@ -232,6 +232,8 @@ function agent_step!(copepod::Copepod, model)
             # kill_agent!(infection, model)
             # return
 
+        else
+            kill_agent!(infection, model)
         end
       
     end
@@ -277,8 +279,6 @@ function eat!(copepod::Copepod, grazer::Grazer, model)
     return
 end
 
-
-# here we are also modifying the feeding rate of copepods
 
 function reproduce!(agent::A, model) where {A}
     agent.energy /= 2
@@ -383,26 +383,9 @@ end
 
 
 
-stable_params = (;
-    n_grazer = 300,
-    n_copepods = 100,
-    n_parasites = 10,
-    virulence = 0,
-    dims = (50, 50),
-    Δenergy_grazer = 5,
-    grazer_reproduce = 0.3,
-    copepod_reproduce = 0.02,
-    Δenergy_copepod = 30,
-    regrowth_time = 30,
-    seed = 71758,
-)
-
-
 
 grazercopepodalgae = initialize_model()
 n = 10
-
-
 adata = [(grazer, count), (copepod, count), (Inf_copepod, count), (parasite, count)]
 mdata = [count_algae]
 adf, mdf = run!(grazercopepodalgae, agent_step!, model_step!, n; adata, mdata)
@@ -415,7 +398,7 @@ params = Dict(
     :n_grazer => 300,
     :n_copepods => 100,
     :n_parasites => 10,
-    :dims => (20, 20),
+    :dims => (50, 50),
     :regrowth_time => 30,
     :Δenergy_grazer => 4,
     :Δenergy_copepod => 30,
@@ -423,7 +406,7 @@ params = Dict(
     :copepod_reproduce => 0.02,
     :Feeding_rate => 0.5,
     :virulence => collect(0:0.1:0.5),
-    :seed => rand(UInt8, 10000)
+    :seed => rand(UInt8, 5)
 )
 
 
@@ -431,102 +414,19 @@ params = Dict(
 adata = [(grazer, count), (copepod, count), (Inf_copepod, count), (parasite, count)]
 mdata = [count_algae]
 
-adf, mdf = paramscan(params, initialize_model; adata, mdata, agent_step!, model_step!, n = 3)
+adf, mdf = paramscan(params, initialize_model; adata, mdata, agent_step!, model_step!, n = 1000)
 
 
+using DataFrames
 
+adf.count_algae .= mdf.count_algae
 
-# models = [initialize_model(seed = x) for x in rand(UInt8, 1000)];
-# @time adf, mdata = ensemblerun!(models, agent_step!, model_step!, 1000; adata, mdata)
-# adf[(end - 10):end, :]
+dfp = select(groupby(adf, [:step, :virulence]), [:count_algae, :count_grazer, :count_copepod, :count_Inf_copepod, :count_parasite] .=> [mean std])
 
-# adf
-
-
-# # CairoMakie.activate!(type = "png")
-# CairoMakie.activate!(type = "svg")
-
-
-# p0 = plot_population_timeseries(adf, mdf, "Virulence:  σ + 0")
-# save("V0.svg", p0, pt_per_unit = 2) # size = 1600 x 1200 pt
-
-
-
-# ## virulence 0.5
-
-# stable_params = (;
-#     n_grazer = 300,
-#     n_copepods = 100,
-#     n_parasites = 10,
-#     virulence = 0.5,
-#     dims = (50, 50),
-#     Δenergy_grazer = 5,
-#     grazer_reproduce = 0.3,
-#     copepod_reproduce = 0.02,
-#     Δenergy_copepod = 30,
-#     regrowth_time = 30,
-#     seed = 71758,
-# )
-
-# grazercopepodalgae = initialize_model(;stable_params...)
-# n = 1000
-# adf, mdf = run!(grazercopepodalgae, agent_step!, model_step!, n; adata, mdata)
-
-
-
-# p1 = plot_population_timeseries(adf, mdf, "Virulence:  σ + 0.5")
-# save("V05.pdf", p1, pt_per_unit = 2) # size = 1600 x 1200 pt
-
-
-
-
-# stable_params = (;
-#     n_grazer = 300,
-#     n_copepods = 100,
-#     n_parasites = 10,
-#     virulence = 0.8,
-#     dims = (50, 50),
-#     Δenergy_grazer = 5,
-#     grazer_reproduce = 0.3,
-#     copepod_reproduce = 0.02,
-#     Δenergy_copepod = 30,
-#     regrowth_time = 30,
-#     seed = 71758,
-# )
-
-# grazercopepodalgae = initialize_model(;stable_params...)
-# n = 1000
-# adf, mdf = run!(grazercopepodalgae, agent_step!, model_step!, n; adata, mdata)
-
-
+dfp[(end-10):end,7:end]
 
 # p2 = plot_population_timeseries(adf, mdf, "Virulence:  σ + 0.8")
 
 # p2
 # save("V08.pdf", p2, pt_per_unit = 2) # size = 1600 x 1200 pt
 
-
-# adf
-
-
-# # grazercopepodalgae = initialize_model()
-# # parameters = Dict(
-# #     :virulence => collect(0:5) )
-
-# # scan_params = Dict(
-# #     :n_grazer => 300,
-# #     :n_copepods => 100,
-# #     :n_parasites => 10,
-# #     :virulence => collect(0:5),
-# #     :dims => (50, 50),
-# #     :Δenergy_grazer => 5,
-# #     :grazer_reproduce => 0.3,
-# #     :copepod_reproduce => 0.02,
-# #     :Δenergy_copepod => 30,
-# #     :regrowth_time => 30,
-# #     :seed => 71758,
-# # )
-
-# # adata = [(grazer, count), (copepod, count), (Inf_copepod, count), (parasite, count)]
-# # mdata = [count_algae]
-# # adf, mdf = paramscan(scan_params, grazercopepodalgae; adata, mdata, agent_step!, model_step!, n = 10)
