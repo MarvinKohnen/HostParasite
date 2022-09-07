@@ -406,7 +406,7 @@ params = Dict(
     :copepod_reproduce => 0.02,
     :Feeding_rate => 0.5,
     :virulence => collect(0:0.1:0.5),
-    :seed => rand(UInt8, 5)
+    :seed => rand(UInt8, 10)
 )
 
 
