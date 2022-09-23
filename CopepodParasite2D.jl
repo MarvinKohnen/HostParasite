@@ -3,13 +3,9 @@
 # initialize fish as some infected some not [check], no parasites for first 20 days
 # have infected fish introduce parasites after 20 days 
 
-# allow reproduction while infected as a tryout 
 
 # virulence = amount of eaten grazers while infected 
 
-#Trophic cascades: energy loss and provision from agents to higher trophic levels
-#90% loss of energy each trophic level; metabolic cost  
-#adding classes of death (dead by fish, dead by energy loss, dead by mortality) 
 
 
 #https://onlinelibrary.wiley.com/doi/epdf/10.1111/j.1461-0248.2006.00995.x  :   independent mortality = death by parasite = 0.05 (p. 49)  
@@ -502,12 +498,7 @@ end
 end
 
 function stickleback_step!(stickleback, model) 
-    stickleback_eat!(stickleback, model)  
     
-    if (rand(model.rng) <= stickleback.reproduction_prob) && (stickleback.infected == 1)
-        parasite_reproduce!(model)
-        stickleback.infected = 0
-    end
     
 #    hunt = [x.pos for x in nearby_agents(stickleback, model, model.stickleback_vision) if (x.type == :grazer && x.age >= 10) || (x.type == :copepod && x.age >= 19)] #only eating adult copepods and grazers
     hunt = [x.pos for x in nearby_agents(stickleback, model, model.stickleback_vision) if  (x.type == :copepod && x.age >= 19*24)] #only eating adult copepods 
@@ -538,6 +529,15 @@ function stickleback_step!(stickleback, model)
         return
     end
     move_along_route!(stickleback, model, model.pathfinder, model.stickleback_vel, model.dt) 
+
+
+    stickleback_eat!(stickleback, model)  
+
+    if (stickleback.infected == 1) #&& (rand(model.rng) <= stickleback.reproduction_prob) 
+        parasite_reproduce!(model)
+        stickleback.infected = 0
+    end
+    
 end
 
 
@@ -791,7 +791,7 @@ params = Dict(
     :copepod_vision => 4,
     :grazer_vision => 2,
     :parasite_vision => 1,
-    :stickleback_vision => 4,
+    :stickleback_vision => [4, 6, 8, 10],  #best to always alter one? 
     :copepod_reproduce => (1/(24)),
     :grazer_reproduce => (1/(24)),
     :parasite_reproduce => 0, 
@@ -814,7 +814,7 @@ params = Dict(
     :copepod_vel => 0.5,
     :grazer_vel => 0.5,
     :parasite_vel => 0.2,
-    :stickleback_vel => 0.5,
+    :stickleback_vel => [0.5, 0.6, 0.7],
     :stickleback_infected => rand((0,1))
     :dt => 1.0,
     :seed => seed,
@@ -822,7 +822,7 @@ params = Dict(
 
 adf = paramscan(params, initialize_model; adata, agent_step!, model_step!, n = 24*20)
 
-
+#FIRST GRAZER IN POSITION???
 
 
 # n=60
@@ -847,19 +847,7 @@ Plots.plot!(t, (adf.count_stickleback), lab = "Fish")
 
 
 
-#ensemblerun!
 
-#paramscan()
-
-#parameters = Dict(
- #   :min_to_be_happy => collect(2:5), # expanded
-  #  :numagents => [200, 300],         # expanded
-   # :griddims => (20, 20),            # not Vector = not expanded
-#)
-
-#carrying capacity: amount of agents per node 
-#model_step!: runs after agents_step!, kills random agents above carrying capacity, sample
-#https://juliadynamics.github.io/Agents.jl/dev/api/#Agents.sample
 #global sensitivity -> ensemblerun  : https://github.com/SciML/GlobalSensitivity.jl
 #Salib py - sobol julia
 
