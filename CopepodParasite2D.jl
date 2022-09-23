@@ -120,21 +120,22 @@ function initialize_model(;
     grazer_vel = 0.5,
     parasite_vel = 0.2,
     stickleback_vel = 1.0,
-    stickleback_infected = rand((0,1)),
+    #stickleback_infected = rand((0,1)),
     hatch_prob = 0.2, #probability for eggs to hatch, 20% as to Merles results (Parasite_eggs/hatching rates excel in Dropbox)
     seed = 23182,
     dt = 1.0,
     )
 
-
     rng = MersenneTwister(seed) #MersenneTwister: pseudo random number generator
-    space = ContinuousSpace((150., 150.); periodic = true)
+    space = ContinuousSpace((150., 150.); periodic = false)
 
     heightmap_path = "WhiteSpace.jpg"
     heightmap = load(heightmap_path)
     dims = (size(heightmap))
     water_walkmap= BitArray(falses(dims))
- # NEEDS TO BE DICTIONARY
+ 
+ 
+    # NEEDS TO BE DICTIONARY
     properties = Dict(
         :pathfinder => AStar(space; walkmap = water_walkmap),
         :Δenergy_copepod => Δenergy_copepod,
@@ -168,7 +169,7 @@ function initialize_model(;
         :grazer_vel => grazer_vel,
         :parasite_vel => parasite_vel,
         :stickleback_vel => stickleback_vel,
-        :stickleback_infected => stickleback_infected,
+        #:stickleback_infected => stickleback_infected,
         :dt => dt,
         :seed => seed,
     )
@@ -211,7 +212,7 @@ function initialize_model(;
                 nextid(model),
                 random_walkable(random_position(model),model, model.pathfinder, model.stickleback_vision),
                 stickleback_reproduce,
-                stickleback_infected, 
+                rand((0,1)), 
                 stickleback_size,
             ),
             model,
@@ -298,7 +299,7 @@ function parasite_step!(parasite, model) #in lab: 2 days max, copepod 4 days max
         return
     end
     #for _ in rand(5:24)
-    walk!(parasite, rand, model; periodic = false)
+    walk!(parasite, rand, model) #periodic = false
     #end
 end
 
@@ -533,7 +534,7 @@ function stickleback_step!(stickleback, model)
 
     stickleback_eat!(stickleback, model)  
 
-    if (stickleback.infected == 1) #&& (rand(model.rng) <= stickleback.reproduction_prob) 
+    if (stickleback.infected == 1) && (rand(model.rng) <= stickleback.reproduction_prob) 
         parasite_reproduce!(model)
         stickleback.infected = 0
     end
@@ -682,6 +683,10 @@ end
 function parasite_reproduce!(model)
     dry_w = rand(Normal(150,50)) ./ 10000
     epg = 39247 .* dry_w .- 47 
+    Δenergy_parasite = 96
+    parasite_reproduce = 0
+    parasite_size = 0.1
+    
     for _ in 1:epg
         if rand(model.rng) <= model.hatch_prob
             id = nextid(model)
@@ -697,6 +702,10 @@ function parasite_reproduce!(model)
             add_agent!(eggs, model)
         end
     end
+    
+
+
+
 return
 end
 
@@ -764,9 +773,6 @@ plotkwargs = (
     offset = offset, 
 )
 
-
-
-
 grazer(a) = a.type == :grazer
 copepod(a) = a.type == :copepod
 copepodInf(a) = a.type == :copepod && a.infected == 1
@@ -775,7 +781,7 @@ phytoplankton(a) = a.type == :phytoplankton
 stickleback(a) = a.type == :stickleback
 sticklebackInf(a) = a.type ==:stickleback && a.infected == 1
 
-n=24*20
+n= 100
 model = initialize_model()
 adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
 adf = run!(model, agent_step!, model_step!, n; adata)
@@ -783,7 +789,7 @@ adf = adf[1]
 show(adf, allrows=true)
 
 params = Dict(
-    :pathfinder => AStar(space; walkmap = water_walkmap),
+   # :pathfinder => AStar(space; walkmap = water_walkmap),
     :Δenergy_copepod => 24*3,
     :Δenergy_grazer => 24,
     :Δenergy_parasite => 24*4,
@@ -815,12 +821,12 @@ params = Dict(
     :grazer_vel => 0.5,
     :parasite_vel => 0.2,
     :stickleback_vel => [0.5, 0.6, 0.7],
-    :stickleback_infected => rand((0,1))
+    #:stickleback_infected => rand((0,1))
     :dt => 1.0,
-    :seed => seed,
+    :seed => rand(UInt8, 1),
 )
 
-adf = paramscan(params, initialize_model; adata, agent_step!, model_step!, n = 24*20)
+adf = paramscan(params, initialize_model; adata, agent_step!, model_step!, n = 24*20) 
 
 #FIRST GRAZER IN POSITION???
 
