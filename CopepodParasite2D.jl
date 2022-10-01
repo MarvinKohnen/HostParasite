@@ -826,7 +826,15 @@ params = Dict(
     :seed => rand(UInt8, 1),
 )
 
+adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
 adf = paramscan(params, initialize_model; adata, agent_step!, model_step!, n = 24*20) 
+adf[1]
+
+
+## Save results
+using CSV, DataFrames
+# write out a DataFrame to csv file
+CSV.write("data.csv", adf[1])
 
 #FIRST GRAZER IN POSITION???
 
