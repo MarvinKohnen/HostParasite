@@ -39,7 +39,7 @@ using FileIO
 using Distributions
 using InteractiveDynamics
 using CairoMakie
-using GLMakie
+#using GLMakie
 using Images #use for url load 
 using FileIO
 using ImageMagick
@@ -113,7 +113,7 @@ function initialize_model(;
     phytoplankton_age = 0,
     phytoplankton_energy = 0,
     copepod_mortality = (1/24) * 0.05,
-    #grazer_mortality = 0.1,
+    grazer_mortality = 0.1,
     phytoplankton_mortality = (1/24)*0.01,
     #stickleback_mortality = 0.2,
     copepod_vel = 0.5,
@@ -138,6 +138,11 @@ function initialize_model(;
     # NEEDS TO BE DICTIONARY
     properties = Dict(
         :pathfinder => AStar(space; walkmap = water_walkmap),
+        :n_copepod => n_copepod, 
+        :n_phytoplankton => n_phytoplankton, 
+        :n_grazer => n_grazer, #100 # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
+        :n_parasite => n_parasite,
+        :n_stickleback => n_stickleback,
         :Δenergy_copepod => Δenergy_copepod,
         :Δenergy_grazer => Δenergy_grazer,
         :Δenergy_parasite => Δenergy_parasite,
@@ -162,7 +167,7 @@ function initialize_model(;
         :phytoplankton_energy => phytoplankton_energy,
         :hatch_prob => hatch_prob,
         :copepod_mortality => copepod_mortality,
-        #grazer_mortality = grazer_mortality,
+        :grazer_mortality => grazer_mortality,
         :phytoplankton_mortality => phytoplankton_mortality,
         #stickleback_mortality = stickleback_mortality,
         :copepod_vel => copepod_vel,
@@ -502,7 +507,7 @@ function stickleback_step!(stickleback, model)
     
     
 #    hunt = [x.pos for x in nearby_agents(stickleback, model, model.stickleback_vision) if (x.type == :grazer && x.age >= 10) || (x.type == :copepod && x.age >= 19)] #only eating adult copepods and grazers
-    hunt = [x.pos for x in nearby_agents(stickleback, model, model.stickleback_vision) if  (x.type == :copepod && x.age >= 19*24)] #only eating adult copepods 
+hunt = [x.pos for x in nearby_agents(stickleback, model, model.stickleback_vision) if  (x.type == :copepod && x.age >= 19*24)] #only eating adult copepods 
     if is_stationary(stickleback, model.pathfinder) && !isempty(hunt)
         sdirection = (0., 0.)
         stoward_direction = []
@@ -781,23 +786,30 @@ phytoplankton(a) = a.type == :phytoplankton
 stickleback(a) = a.type == :stickleback
 sticklebackInf(a) = a.type ==:stickleback && a.infected == 1
 
-n= 100
+n= 2
 model = initialize_model()
 adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
 adf = run!(model, agent_step!, model_step!, n; adata)
 adf = adf[1]
 show(adf, allrows=true)
+5*8*3*5
+
+
 
 params = Dict(
-   # :pathfinder => AStar(space; walkmap = water_walkmap),
-    :Δenergy_copepod => 24*3,
+    :n_copepod =>  [1, 300, 500]  ,#collect(0:100:500), # 
+    :n_phytoplankton =>  3000,  #collect(1000:500:4000), 
+    :n_grazer =>  300,  #collect(1:100:500), # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
+    :n_parasite => 2000, #collect(1:1000:3000),
+    :n_stickleback => 100, #[1:10:40],
+    :Δenergy_copepod => 24*5,
     :Δenergy_grazer => 24,
     :Δenergy_parasite => 24*4,
     #Δenergy_stickleback = Δenergy_stickleback,
     :copepod_vision => 4,
     :grazer_vision => 2,
     :parasite_vision => 1,
-    :stickleback_vision => [4, 6, 8, 10],  #best to always alter one? 
+    :stickleback_vision => 8, #[4, 6, 8, 10],  #best to always alter one? 
     :copepod_reproduce => (1/(24)),
     :grazer_reproduce => (1/(24)),
     :parasite_reproduce => 0, 
@@ -814,27 +826,31 @@ params = Dict(
     :phytoplankton_energy => 0,
     :hatch_prob => 0.2,
     :copepod_mortality => (1/24)*0.05,
-    #grazer_mortality = grazer_mortality,
+    :grazer_mortality => (1/24)*0.1,
     :phytoplankton_mortality => (1/24) * 0.01,
     #stickleback_mortality = stickleback_mortality,
     :copepod_vel => 0.5,
-    :grazer_vel => 0.5,
-    :parasite_vel => 0.2,
-    :stickleback_vel => [0.5, 0.6, 0.7],
+    :grazer_vel => 0.25,
+    :parasite_vel => 0.1,
+    :stickleback_vel => 0.7, #[0.5, 0.6, 0.7],
     #:stickleback_infected => rand((0,1))
     :dt => 1.0,
     :seed => rand(UInt8, 1),
 )
 
 adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
-adf = paramscan(params, initialize_model; adata, agent_step!, model_step!, n = 24*20) 
-adf[1]
+adf = paramscan(params, initialize_model; adata, agent_step!, model_step!, n = 5)
+
+adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
+adf = paramscan(params, initialize_model; adata, agent_step!, model_step!, n = 24*100) 
+
+println(adf[1])
 
 
 ## Save results
 using CSV, DataFrames
 # write out a DataFrame to csv file
-CSV.write("data.csv", adf[1])
+CSV.write("data_2.csv", adf[1])
 
 #FIRST GRAZER IN POSITION???
 
@@ -847,16 +863,24 @@ CSV.write("data.csv", adf[1])
 # show(adf, allrows=true)
 
 
+#plot(adf.count_copepod, adf.count_grazer, adf.count_parasite, adf.count_phytoplankton, adf.count_copepodInf, adf.count_stickleback, adf.count_sticklebackInf)
+
+df = adf[1]
+
+names(df)
+
+
+
+
+
+t = adf[1].step ./ 24
 
 using Plots
 
-#plot(adf.count_copepod, adf.count_grazer, adf.count_parasite, adf.count_phytoplankton, adf.count_copepodInf, adf.count_stickleback, adf.count_sticklebackInf)
-
-t = adf.step ./ 24
-Plots.plot(t, (adf.count_phytoplankton), lab = "Phytoplankton")
-Plots.plot!(t, (adf.count_copepod), lab = "Copepods")
-Plots.plot!(t, (adf.count_grazer), lab = "Grazers")
-Plots.plot!(t, (adf.count_stickleback), lab = "Fish")
+Plots.plot(t, (df.count_phytoplankton), lab = "Phytoplankton")
+lines!(t, (df.count_copepod), lab = "Copepods")
+plot!(t, (adf.count_grazer), lab = "Grazers")
+plot!(t, (adf.count_stickleback), lab = "Fish")
 
 
 
