@@ -34,7 +34,7 @@
 
 using Pkg
 
-Pkg.add("Random", "Agents", "FileIO", "Distributions", "InteractiveDynamics", "Images", "ImageMagick", "DataFrames")
+Pkg.add(["Random", "Agents", "FileIO", "Distributions", "InteractiveDynamics", "Images", "ImageMagick", "DataFrames"])
 
 using Random
 using Agents
