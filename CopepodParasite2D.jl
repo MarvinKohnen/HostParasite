@@ -48,6 +48,8 @@ using Images #use for url load
 using ImageMagick
 using DataFrames
 
+
+pwd()
 #cd("Dropbox/Jaime M/Projects_JM/Muenster/Marvin/project/HostParasite/HostParasite/")
 
 mutable struct CopepodGrazerParasitePhytoplankton <: AbstractAgent
@@ -853,7 +855,7 @@ println(adf[1])
 ## Save results
 using CSV, DataFrames
 # write out a DataFrame to csv file
-CSV.write("data_2.csv", adf[1])
+CSV.write("/scratch/tmp/janayaro/My_projects/Copepod/data_2.csv", adf[1])
 
 #FIRST GRAZER IN POSITION???
 
