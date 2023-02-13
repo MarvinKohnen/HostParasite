@@ -865,22 +865,22 @@ CSV.write("data_2.csv", adf[1])
 
 #plot(adf.count_copepod, adf.count_grazer, adf.count_parasite, adf.count_phytoplankton, adf.count_copepodInf, adf.count_stickleback, adf.count_sticklebackInf)
 
-df = adf[1]
+# df = adf[1]
 
-names(df)
-
-
+# names(df)
 
 
 
-t = adf[1].step ./ 24
 
-using Plots
 
-Plots.plot(t, (df.count_phytoplankton), lab = "Phytoplankton")
-lines!(t, (df.count_copepod), lab = "Copepods")
-plot!(t, (adf.count_grazer), lab = "Grazers")
-plot!(t, (adf.count_stickleback), lab = "Fish")
+# t = adf[1].step ./ 24
+
+# using Plots
+
+# Plots.plot(t, (df.count_phytoplankton), lab = "Phytoplankton")
+# lines!(t, (df.count_copepod), lab = "Copepods")
+# plot!(t, (adf.count_grazer), lab = "Grazers")
+# plot!(t, (adf.count_stickleback), lab = "Fish")
 
 
 
