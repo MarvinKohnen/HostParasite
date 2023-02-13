@@ -32,16 +32,19 @@
 #8: https://link.springer.com/content/pdf/10.1007/BF00006104.pdf
 #9 https://www.nature.com/articles/s41598-019-51705-9 for functional stuff and 5 eatings per day 
 
+using Pkg
+
+Pkg.add("Random", "Agents", "FileIO", "Distributions", "InteractiveDynamics", "Images", "ImageMagick", "DataFrames")
+
 using Random
 using Agents
 using Agents.Pathfinding
 using FileIO
 using Distributions
 using InteractiveDynamics
-using CairoMakie
+#using CairoMakie
 #using GLMakie
 using Images #use for url load 
-using FileIO
 using ImageMagick
 using DataFrames
 
