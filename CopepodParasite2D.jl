@@ -134,7 +134,7 @@ function initialize_model(;
     rng = MersenneTwister(seed) #MersenneTwister: pseudo random number generator
     space = ContinuousSpace((150., 150.); periodic = false)
 
-    heightmap_path = "WhiteSpace.jpg"
+    heightmap_path = "/home/j/janayaro/Projects_JM/HostParasite/WhiteSpace.jpg"
     heightmap = load(heightmap_path)
     dims = (size(heightmap))
     water_walkmap= BitArray(falses(dims))
