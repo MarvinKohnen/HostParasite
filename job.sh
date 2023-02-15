@@ -8,8 +8,8 @@
  
 #SBATCH --job-name=My_Copepod         # the name of your job
 #SBATCH --mail-type=ALL             # receive an email when your job starts, finishes normally or is aborted
-#SBATCH --mail-user=janayaro@uni-muenster.de # your mail address
- 
+#SBATCH --mail-user= janayaro@uni-muenster.de # your mail address
+#SBATCH --account=uni
 # load needed modules
 ml palma/2022a
 ml Julia/1.8.2-linux-x86_64
