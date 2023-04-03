@@ -132,9 +132,9 @@ function initialize_model(;
     )
 
     rng = MersenneTwister(seed) #MersenneTwister: pseudo random number generator
-    space = ContinuousSpace((150., 150.); periodic = false)
+    space = ContinuousSpace((50., 50.); periodic = false)
 
-    heightmap_path = "/home/j/janayaro/Projects_JM/HostParasite/WhiteSpace.jpg"
+    heightmap_path = "WhiteSpace.jpg"
     heightmap = load(heightmap_path)
     dims = (size(heightmap))
     water_walkmap= BitArray(falses(dims))
@@ -801,25 +801,67 @@ show(adf, allrows=true)
 
 
 
+# params = Dict(
+#     :n_copepod =>  [1, 300, 500]  ,#collect(0:100:500), # 
+#     :n_phytoplankton =>  3000,  #collect(1000:500:4000), 
+#     :n_grazer =>  300,  #collect(1:100:500), # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
+#     :n_parasite => 2000, #collect(1:1000:3000),
+#     :n_stickleback => 100, #[1:10:40],
+#     :Δenergy_copepod => 24*5,
+#     :Δenergy_grazer => 24,
+#     :Δenergy_parasite => 24*4,
+#     #Δenergy_stickleback = Δenergy_stickleback,
+#     :copepod_vision => 4,
+#     :grazer_vision => 2,
+#     :parasite_vision => 1,
+#     :stickleback_vision => 8, #[4, 6, 8, 10],  #best to always alter one? 
+#     :copepod_reproduce => (1/(24)),
+#     :grazer_reproduce => (1/(24)),
+#     :parasite_reproduce => 0, 
+#     :stickleback_reproduce => 0.8,
+#     :phytoplankton_reproduce => (1/(24)),
+#     :copepod_age => 0,
+#     :grazer_age => 0,
+#     :parasite_age => 0,
+#     :copepod_size => 1,
+#     :grazer_size => 1,
+#     :parasite_size => 1,
+#     :stickleback_size => 3,
+#     :phytoplankton_age => 0,
+#     :phytoplankton_energy => 0,
+#     :hatch_prob => 0.2,
+#     :copepod_mortality => (1/24)*0.05,
+#     :grazer_mortality => (1/24)*0.1,
+#     :phytoplankton_mortality => (1/24) * 0.01,
+#     #stickleback_mortality = stickleback_mortality,
+#     :copepod_vel => 0.5,
+#     :grazer_vel => 0.25,
+#     :parasite_vel => 0.1,
+#     :stickleback_vel => 0.7, #[0.5, 0.6, 0.7],
+#     #:stickleback_infected => rand((0,1))
+#     :dt => 1.0,
+#     :seed => rand(UInt8, 1),
+# )
+
+
 params = Dict(
-    :n_copepod =>  [1, 300, 500]  ,#collect(0:100:500), # 
-    :n_phytoplankton =>  3000,  #collect(1000:500:4000), 
-    :n_grazer =>  300,  #collect(1:100:500), # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
-    :n_parasite => 2000, #collect(1:1000:3000),
-    :n_stickleback => 100, #[1:10:40],
-    :Δenergy_copepod => 24*5,
+    :n_copepod => [300], 
+    :n_phytoplankton => 3000, 
+    :n_grazer => 300,
+    :n_parasite => 2000,
+    :n_stickleback => 100,
+    :Δenergy_copepod => 24 * 5,
     :Δenergy_grazer => 24,
-    :Δenergy_parasite => 24*4,
-    #Δenergy_stickleback = Δenergy_stickleback,
+    :Δenergy_parasite => 24 * 4,
     :copepod_vision => 4,
     :grazer_vision => 2,
     :parasite_vision => 1,
-    :stickleback_vision => 8, #[4, 6, 8, 10],  #best to always alter one? 
-    :copepod_reproduce => (1/(24)),
-    :grazer_reproduce => (1/(24)),
+    :stickleback_vision => 8,
+    :copepod_reproduce => 1 / 24,
+    :grazer_reproduce => 1 / 24,
     :parasite_reproduce => 0, 
     :stickleback_reproduce => 0.8,
-    :phytoplankton_reproduce => (1/(24)),
+    :phytoplankton_reproduce => 1 / 24,
     :copepod_age => 0,
     :grazer_age => 0,
     :parasite_age => 0,
@@ -830,15 +872,13 @@ params = Dict(
     :phytoplankton_age => 0,
     :phytoplankton_energy => 0,
     :hatch_prob => 0.2,
-    :copepod_mortality => (1/24)*0.05,
-    :grazer_mortality => (1/24)*0.1,
-    :phytoplankton_mortality => (1/24) * 0.01,
-    #stickleback_mortality = stickleback_mortality,
+    :copepod_mortality => (1 / 24) * 0.05,
+    :grazer_mortality => (1 / 24) * 0.1,
+    :phytoplankton_mortality => (1 / 24) * 0.01,
     :copepod_vel => 0.5,
     :grazer_vel => 0.25,
     :parasite_vel => 0.1,
-    :stickleback_vel => 0.7, #[0.5, 0.6, 0.7],
-    #:stickleback_infected => rand((0,1))
+    :stickleback_vel => 0.7,
     :dt => 1.0,
     :seed => rand(UInt8, 1),
 )
@@ -855,6 +895,7 @@ println(adf[1])
 ## Save results
 using CSV, DataFrames
 # write out a DataFrame to csv file
+CSV.write("data_2.csv", adf[1])
 CSV.write("/scratch/tmp/janayaro/My_projects/Copepod/data_2.csv", adf[1])
 
 #FIRST GRAZER IN POSITION???
@@ -870,25 +911,25 @@ CSV.write("/scratch/tmp/janayaro/My_projects/Copepod/data_2.csv", adf[1])
 
 #plot(adf.count_copepod, adf.count_grazer, adf.count_parasite, adf.count_phytoplankton, adf.count_copepodInf, adf.count_stickleback, adf.count_sticklebackInf)
 
-# df = adf[1]
+df = adf[1]
 
-# names(df)
-
-
+names(df)
 
 
 
-# t = adf[1].step ./ 24
-
-# using Plots
-
-# Plots.plot(t, (df.count_phytoplankton), lab = "Phytoplankton")
-# lines!(t, (df.count_copepod), lab = "Copepods")
-# plot!(t, (adf.count_grazer), lab = "Grazers")
-# plot!(t, (adf.count_stickleback), lab = "Fish")
 
 
+t = adf[1].step ./ 24
 
+using Plots
+
+Plots.plot(t, (df.count_phytoplankton), lab = "Phytoplankton")
+plot!(t, (df.count_copepod), lab = "Copepods")
+plot!(t, (adf.count_grazer), lab = "Grazers")
+plot!(t, (adf.count_stickleback), lab = "Fish")
+
+
+((2E-6*2E-3) / 10E-3) / 1E-6
 
 
 #global sensitivity -> ensemblerun  : https://github.com/SciML/GlobalSensitivity.jl
