@@ -1,4 +1,3 @@
-
 # upon infection of copepods less evasion of fish after a couple of days (infection days 13! Haferr-Hamann 2019 ) [check]
 # initialize fish as some infected some not [check], no parasites for first 20 days
 # have infected fish introduce parasites after 20 days 
@@ -6,6 +5,11 @@
 
 # virulence = amount of eaten grazers while infected 
 
+
+# TODO:
+# Energy gain copepod differ for phytoplankton and grazer (also maybe only prey on grazer?)
+# check movement of hunting agents (maybe only chase one agent not all)
+# problems: stepping uses random agents -> we should use a rigid order?
 
 
 #https://onlinelibrary.wiley.com/doi/epdf/10.1111/j.1461-0248.2006.00995.x  :   independent mortality = death by parasite = 0.05 (p. 49)  
@@ -47,6 +51,19 @@ using InteractiveDynamics
 using Images #use for url load 
 using ImageMagick
 using DataFrames
+using Logging 
+
+#Open new file to log
+io = open("CopepodLogging.txt", "w+")
+
+#create logger
+logger = SimpleLogger(io)
+
+#initiate Stream and flush old file 
+flush(io)
+
+#make logger global so we can use it later
+global_logger(logger)
 
 
 pwd()
@@ -85,22 +102,22 @@ function Stickleback(id, pos, repr, infected)
     CopepodGrazerParasitePhytoplankton(id, pos, :stickleback, 100, repr, 10, infected, 10, rand(1:2), 0)
 end
 
+
 norm(vec) = √sum(vec .^ 2)
 
 function initialize_model(;
-    n_copepod = 30, #100
+    n_copepod = 100, #30, #100
     n_phytoplankton = 400, 
     n_grazer = 160, #100 # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
-    n_parasite = 300, #1000
+    n_parasite = 4000, #300 
     n_stickleback = 10,
 
     # Energy parameters
     Δenergy_copepod = 30, #5 days
     Δenergy_grazer = 30, #1 days
-    Δenergy_parasite = 30,# 4 days
+    Δenergy_parasite = 50,# 4 days
     Δenergy_phytoplankton = 10,   
     #Δenergy_stickleback = 96,
-
 
     copepod_vision = 10,  # how far copepods can see grazer to hunt
     grazer_vision = 6,  # how far grazer see phytoplankton to feed on
@@ -111,7 +128,7 @@ function initialize_model(;
     grazer_reproduce = 0.06,
     parasite_reproduce = 0, 
     phytoplankton_reproduce = 0.2,
-    stickleback_reproduce = 0.8, #once per day
+    stickleback_reproduce = 1.0, #once per day
     
     phytoplankton_energy = 0,
 
@@ -134,14 +151,14 @@ function initialize_model(;
     )
 
     rng = MersenneTwister(seed) #MersenneTwister: pseudo random number generator
-    space = ContinuousSpace((100., 100.); periodic = false)
+    space = ContinuousSpace((100., 100.); periodic = true)
 
     heightmap_path = "WhiteSpace.jpg"
     heightmap = load(heightmap_path)
     dims = (size(heightmap))
     water_walkmap= BitArray(falses(dims))
  
-#  
+
     # NEEDS TO BE DICTIONARY
     properties = Dict(
         :pathfinder => AStar(space; walkmap = water_walkmap),
@@ -182,12 +199,13 @@ function initialize_model(;
             Grazer(
                 nextid(model),
                 random_walkable(random_position(model), model, model.pathfinder, model.grazer_vision),
-                rand(model.rng,(Δenergy_grazer:2*Δenergy_grazer)),
+                rand(model.rng,(0.8*Δenergy_grazer:1.2*Δenergy_grazer)),
                 grazer_reproduce,
                 Δenergy_grazer,
             ),
             model,
         )
+        #@info("added Grazer to model with ID: " + Grazer.id + "at Position: " + Grazer.pos)
     end
 
     for _ in 1:n_copepod
@@ -195,7 +213,7 @@ function initialize_model(;
             Copepod(
                 nextid(model),
                 random_walkable(random_position(model), model, model.pathfinder, model.copepod_vision),
-                rand(model.rng, Δenergy_copepod:2*Δenergy_copepod),
+                rand(model.rng, 0.8*Δenergy_copepod:1.2*Δenergy_copepod),
                 copepod_reproduce,
                 Δenergy_copepod,
             ),
@@ -213,8 +231,9 @@ function initialize_model(;
             ),
             model,
         )
+        #@info("added Stickleback to Map, with Id:" + Stickleback.id + " and position:" + Stickleback.pos)
+        #doesnt work here??? why not 
     end
-
     
     for _ in 1:n_parasite
         add_agent_pos!(
@@ -245,17 +264,21 @@ function initialize_model(;
 end
     
 function agent_step!(agent::CopepodGrazerParasitePhytoplankton, model)  #agent
-
     if agent.type == :grazer 
         grazer_step!(agent, model)
+        @info("now stepping agent of type grazer with ID: " * string(agent.id))
     elseif agent.type == :copepod 
         copepod_step!(agent, model)
+        @info("now stepping agent of type copepod with ID: " * string(agent.id))
     elseif agent.type == :parasite
         parasite_step!(agent, model)
+        @info("now stepping agent of type parasite with ID: " * string(agent.id))
     elseif agent.type == :stickleback
         stickleback_step!(agent, model)
+        @info("now stepping agent of type Stickleback with ID: " * string(agent.id))
     else 
         phytoplankton_step!(agent, model)
+        @info("now stepping agent of type phytoplankton with ID: " * string(agent.id))
     end
 end
 
@@ -265,14 +288,14 @@ end
    #     K = 10
     #    if n>=K
      #       ids = ids_in_position(p, model)
-      #      genocide!(model, rand(ids,(n-K)))
+      #      remove_all!(model, rand(ids,(n-K)))
        # end
     #end
 #end
 
 function phytoplankton_step!(phytoplankton, model)
     if rand(model.rng) < model.phytoplankton_mortality
-        kill_agent!(phytoplankton, model, model.pathfinder)
+        remove_agent!(phytoplankton, model, model.pathfinder)
         return
     end
     phytoplankton.energy += 3
@@ -283,8 +306,10 @@ end
     
 function parasite_step!(parasite, model) #in lab: 2 days max, copepod 4 days max without food 
     parasite.energy -= 1
+    @info("This parasite with Id: " * string(parasite.id) * " has this much energy left: " * string(parasite.energy))
     if parasite.energy < 0
-        kill_agent!(parasite, model, model.pathfinder)
+        remove_agent!(parasite, model, model.pathfinder)
+        @info("This grazer with Id: " * string(parasite.id) * " has this much energy left: " * string(parasite.energy))
         return
     end
     walk!(parasite, rand, model) #periodic = false
@@ -292,27 +317,33 @@ end
 
 
 function grazer_step!(grazer, model) 
+    @info("This grazer with Id: " * string(grazer.id) * " has this much energy left: " * string(grazer.energy))
     if grazer.energy <= 15
+        @info("This grazer called grazer_eat! with Id: " * string(grazer.id) * ", since he has this much energy left: " * string(grazer.energy))
         grazer_eat!(grazer, model)
     end
     grazer.energy -=model.dt
-
+    @info("This grazer with Id: " * string(grazer.id) * " has now this much energy left: " * string(grazer.energy) * ", because model.dt was: " * string(model.dt))
     if grazer.energy < 0
-        kill_agent!(grazer, model, model.pathfinder)
+        remove_agent!(grazer, model, model.pathfinder)
+        @info("This grazer with Id: " * string(grazer.id) * " died of energy loss")
         return
     end
     if rand(model.rng) < model.grazer_mortality
-        kill_agent!(grazer, model)
+        remove_agent!(grazer, model)
+        @info("This grazer with Id: " * string(grazer.id) * " died of mortality")
         return
     end
     
     if rand(model.rng) <= grazer.reproduction_prob * model.dt
+        @info("This grazer with Id: " * string(grazer.id) * " reproduced")
         grazer_reproduce!(grazer, model)
     end
         
     predators = [x.pos for x in nearby_agents(grazer, model, model.grazer_vision) if x.type == :copepod || x.type == :stickleback]
 
     if !isempty(predators) && is_stationary(grazer, model.pathfinder)
+        @info("This grazer with Id: " * string(grazer.id) * " is fleeing from predators")
         direction = (0., 0.)
         away_direction = []
         for i in 1:length(predators)
@@ -351,31 +382,36 @@ function grazer_step!(grazer, model)
 end
  
 function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (parasites want to stay in that vicinity)
-    #print(copepod.Δenergy)
     if rand(model.rng) < model.copepod_mortality
-        kill_agent!(copepod, model)
+        remove_agent!(copepod, model)
+        @info("This copepod called copepod_eat! with Id: " * string(copepod.id) * ", died of Mortality")
         return
     end
     if rand(model.rng) <= copepod.reproduction_prob * model.dt
         copepod_reproduce!(copepod, model)
     end
-    
-
-    copepod_eat!(copepod, model)
+   
+    if copepod.energy <= 15
+        @info("This copepod called grazer_eat! with Id: " * string(copepod.id) * ", since he has this much energy left: " * string(copepod.energy))
+        copepod_eat!(copepod, model)
+    end
     copepod.energy -= model.dt
+    @info("This copepod with Id: " * string(copepod.id) * ", has now this much energy left " * string(copepod.energy))
     
     if copepod.energy < 0
-        kill_agent!(copepod, model, model.pathfinder)
+        remove_agent!(copepod, model, model.pathfinder)
+        @info("This copepod with Id: " * string(copepod.id) * ", died of energyloss")
         return
     end
     
-        
-    if copepod.infectiondays <= 12 
+    
+    if copepod.infectiondays <= 2#12 
         prey = [x.pos for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :grazer]
         cpredators = [x.pos for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :Stickleback]
         cdirection = (0., 0.)
         caway_direction = (0.,0.)
         if !isempty(cpredators) 
+            @info("This copepod with Id: " * string(copepod.id) * ", is fleeing from predators")
             caway_direction = []
             for i in 1:length(cpredators)
                 if i == 1
@@ -427,6 +463,7 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
         cdirection = (0., 0.)
         ctoward_direction = (0.,0.)
         if !isempty(prey)
+            @info("This copepod with Id: " * string(copepod.id) * ", is hunting prey")
             ctoward_direction = []
             for i in 1:length(prey)
                 if i == 1
@@ -465,6 +502,7 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
     if copepod.infected == 1
         copepod_eat!(copepod, model)
         infectiondays +=1
+        @info("copepod with id " * string(copepod.id) * " is now infected for " * string(copepod.infectiondays) * "steps")
         copepod.energy -= model.dt
         move_along_route!(copepod, model, model.pathfinder, model.copepod_vel, model.dt)
     end
@@ -476,6 +514,7 @@ function stickleback_step!(stickleback, model)
     
     hunt = [x.pos for x in nearby_agents(stickleback, model, model.stickleback_vision) if  (x.type == :copepod)]
     if is_stationary(stickleback, model.pathfinder) && !isempty(hunt)
+        @info("This Stickleback with Id: " * string(stickleback.id) * ", is hunting the following agents: " )
         sdirection = (0., 0.)
         stoward_direction = []
         for i in 1:length(hunt)
@@ -509,7 +548,6 @@ function stickleback_step!(stickleback, model)
     if (stickleback.infected == 1) && (rand(model.rng) <= stickleback.reproduction_prob) 
         parasite_reproduce!(model)
         stickleback.infected = 0
-        print("parasite reproduced")
     end
     
 end
@@ -518,12 +556,14 @@ end
 function stickleback_eat!(stickleback, model)
     chase = [x for x in nearby_agents(stickleback, model, model.stickleback_vision) if x.type == :copepod || x.type == :grazer]
     if !isempty(chase)
+        @info("chase is not empty!")
         for x in chase
             if x.infected == 1
                 stickleback.infected = 1
-                print("SB infected")
+                @info("Stickleback with Id: " * string(stickleback.id) * "got infected")
             end
-            kill_agent!(x, model, model.pathfinder)
+            @info("This agent of type:" * string(x.type) * " and id:" * string(x.id) * " was eaten by Stickleback with id:" * string(stickleback.id))
+            remove_agent!(x, model, model.pathfinder)
         end
     end
 end
@@ -535,10 +575,8 @@ function copepod_eat!(copepod, model)
             if x.type == :grazer  
                 copepod.fullness += 1 
             end
-            #if x.type == :phytoplankton
-                
-            #end
-            kill_agent!(x, model, model.pathfinder)
+            @info("This agent of type:" * string(x.type) * " and id:" * string(x.id) * " was eaten by Copepod with id:" * string(copepod.id))
+            remove_agent!(x, model, model.pathfinder)
             copepod.energy += copepod.Δenergy
         end
     end
@@ -547,9 +585,11 @@ function copepod_eat!(copepod, model)
     infection = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :parasite]
     if !isempty(infection)
         for x in infection
-            kill_agent!(x, model, model.pathfinder)
+            remove_agent!(x, model, model.pathfinder)
+            
             copepod.infected = 1
         end
+        @info("This Copepod with Id: " * string(copepod.id) * ", got infected")
     end
 end
 
@@ -557,10 +597,11 @@ function grazer_eat!(grazer, model)
     plankton = [x for x in nearby_agents(grazer, model) if x.type == :phytoplankton]
     if !isempty(plankton)
         for x in plankton
-        #plankton = rand(model.rng, phytoplankton)
-        grazer.energy += grazer.Δenergy
-        #println("$grazer.energy \n" )
-        kill_agent!(x, model, model.pathfinder)
+            grazer.energy += grazer.Δenergy
+            remove_agent!(x, model, model.pathfinder)
+            grazer_pos = grazer.pos
+            plankton_pos = x.pos
+            @info("Grazer at position " * string(grazer_pos) * "ate phytoplankton at pos: " * string(plankton_pos))
         end
     end
 end
@@ -569,11 +610,11 @@ function grazer_reproduce!(grazer, model)
     if grazer.gender == 1
         
         #grazer.energy /= 2
-        for _ in 1:rand(10:72)
+        for _ in 1:rand(1:5)
             id = nextid(model)
             offspring = CopepodGrazerParasitePhytoplankton(
                 id,
-                grazer.pos,
+                random_position(model),
                 grazer.type,
                 model.Δenergy_grazer,
                 grazer.reproduction_prob,
@@ -583,6 +624,10 @@ function grazer_reproduce!(grazer, model)
                 rand(1:2),
                 0
             )
+        x = offspring.id
+        y = offspring.pos
+        
+        @info("Added new Grazer to model with id: " * string(x) * ", at pos: " * string(y))
         add_agent_pos!(offspring, model)
         end
         return
@@ -596,9 +641,9 @@ function copepod_reproduce!(copepod, model)
     #elseif
     if copepod.gender == 1 
        
-        copepod.energy /= 2
+        #copepod.energy /= 2
 
-        for _ in 1:(rand(Normal(92, 5))) 
+        for _ in 1:(rand(1:5))#(rand(Normal(92, 5))) 
             id = nextid(model)
             offspring = CopepodGrazerParasitePhytoplankton(
                 id,
@@ -612,6 +657,10 @@ function copepod_reproduce!(copepod, model)
                 rand(1:2),
                 0
             )
+        x = offspring.id
+        y = offspring.pos
+        
+        @info("Added new Copepod to model with id: " * string(x) * ", at pos: " * string(y))
         add_agent_pos!(offspring, model)
         end
     return
@@ -631,8 +680,12 @@ function phytoplankton_reproduce!(phytoplankton, model)
         phytoplankton.reproduction_prob,
         phytoplankton.Δenergy,
     )
+    x = offspring.id
+    y = offspring.pos
+        
+    @info("Added new Phytoplankton to model with id: " * string(x) * ", at pos: " * string(y))
     add_agent_pos!(offspring, model)
-    kill_agent!(phytoplankton, model)
+    Agents.remove_agent!(phytoplankton, model)
     return
 end
 
@@ -641,18 +694,22 @@ function parasite_reproduce!(model)
     epg = 39247 .* dry_w .- 47 
     Δenergy_parasite = 96
     parasite_reproduce = 0
-    print(epg)
+    @info("amount of parasite eggs introduced: " + epg)
     for _ in 1:epg
         if rand(model.rng) <= model.hatch_prob
             id = nextid(model)
-            eggs = Parasite(
+            egg = Parasite(
                 id,
                 random_walkable(random_position(model), model, model.pathfinder),
                 rand(model.rng, (Δenergy_parasite:Δenergy_parasite*2)),
                 parasite_reproduce,
                 Δenergy_parasite,
             )
-            add_agent!(eggs, model)
+            x = egg.id
+            y = egg.pos
+        
+            @info("Added new Parasite to model with id: " * string(x) * ", at pos: " * string(y))
+            add_agent!(egg, model)
         end
     end
 
@@ -661,6 +718,7 @@ end
 
 
 function model_step!(model)
+    @info("Advancing the model one step!")
     agents = collect(allagents(model))
     x1 = filter!(x -> x.type == :phytoplankton, agents)
     ids = []
@@ -675,7 +733,7 @@ function model_step!(model)
         to_kill = rand(1:length(ids), n-K)
 
         for j in 1:length(to_kill)
-            kill_agent!(x1[j], model)
+            remove_agent!(x1[j], model)
         end
     end   
 
@@ -731,11 +789,17 @@ phytoplankton(a) = a.type == :phytoplankton
 stickleback(a) = a.type == :stickleback
 sticklebackInf(a) = a.type ==:stickleback && a.infected == 1
 
-n= 4
+
+
+#main
+n= 48
 model = initialize_model()
+
 adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
 adf = run!(model, agent_step!, model_step!, n; adata)
 adf = adf[1]
+close(io)
+
 show(adf, allrows=true)
 
 
@@ -784,61 +848,60 @@ show(adf, allrows=true)
 # )
 
 
-params = Dict(
-    :n_copepod => [300], 
-    :n_phytoplankton => 3000, 
-    :n_grazer => 300,
-    :n_parasite => 2000,
-    :n_stickleback => 100,
-    :Δenergy_copepod => 24 * 5,
-    :Δenergy_grazer => 24,
-    :Δenergy_parasite => 24 * 4,
-    :copepod_vision => 4,
-    :grazer_vision => 2,
-    :parasite_vision => 1,
-    :stickleback_vision => 8,
-    :copepod_reproduce => 1 / 24,
-    :grazer_reproduce => 1 / 24,
-    :parasite_reproduce => 0, 
-    :stickleback_reproduce => 0.8,
-    :phytoplankton_reproduce => 1 / 24,
-    :copepod_age => 0,
-    :grazer_age => 0,
-    :parasite_age => 0,
-    :copepod_size => 1,
-    :grazer_size => 1,
-    :parasite_size => 1,
-    :stickleback_size => 3,
-    :phytoplankton_age => 0,
-    :phytoplankton_energy => 0,
-    :hatch_prob => 0.2,
-    :copepod_mortality => (1 / 24) * 0.05,
-    :grazer_mortality => (1 / 24) * 0.1,
-    :phytoplankton_mortality => (1 / 24) * 0.01,
-    :copepod_vel => 0.5,
-    :grazer_vel => 0.25,
-    :parasite_vel => 0.1,
-    :stickleback_vel => 0.7,
-    :dt => 1.0,
-    :seed => rand(UInt8, 1),
-)
+# params = Dict(
+#     :n_copepod => [300], 
+#     :n_phytoplankton => 3000, 
+#     :n_grazer => 300,
+#     :n_parasite => 2000,
+#     :n_stickleback => 100,
+#     :Δenergy_copepod => 24 * 5,
+#     :Δenergy_grazer => 24,
+#     :Δenergy_parasite => 24 * 4,
+#     :copepod_vision => 4,
+#     :grazer_vision => 2,
+#     :parasite_vision => 1,
+#     :stickleback_vision => 8,
+#     :copepod_reproduce => 1 / 24,
+#     :grazer_reproduce => 1 / 24,
+#     :parasite_reproduce => 0, 
+#     :stickleback_reproduce => 0.8,
+#     :phytoplankton_reproduce => 1 / 24,
+#     :copepod_age => 0,
+#     :grazer_age => 0,
+#     :parasite_age => 0,
+#     :copepod_size => 1,
+#     :grazer_size => 1,
+#     :parasite_size => 1,
+#     :stickleback_size => 3,
+#     :phytoplankton_age => 0,
+#     :phytoplankton_energy => 0,
+#     :hatch_prob => 0.2,
+#     :copepod_mortality => (1 / 24) * 0.05,
+#     :grazer_mortality => (1 / 24) * 0.1,
+#     :phytoplankton_mortality => (1 / 24) * 0.01,
+#     :copepod_vel => 0.5,
+#     :grazer_vel => 0.25,
+#     :parasite_vel => 0.1,
+#     :stickleback_vel => 0.7,
+#     :dt => 1.0,
+#     :seed => rand(UInt8, 1),
+# )
 
-adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
-adf = paramscan(params, initialize_model; adata, agent_step!, model_step!, n = 5)
+###adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
+###adf = paramscan(params, initialize_model; adata, agent_step!, model_step!, n = 5)
 
-adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
-adf = paramscan(params, initialize_model; adata, agent_step!, model_step!, n = 24) 
+###adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
+###adf = paramscan(params, initialize_model; adata, agent_step!, model_step!, n = 24) 
 
-println(adf[1])
+####println(adf[1])
 
 
 ## Save results
-using CSV, DataFrames
+#####using CSV, DataFrames
 # write out a DataFrame to csv file
-CSV.write("data_2.csv", adf[1])
+#####CSV.write("data_2.csv", adf[1])
 # CSV.write("/scratch/tmp/janayaro/My_projects/Copepod/data_2.csv", adf[1])
 
-#FIRST GRAZER IN POSITION???
 
 
 # n=60
@@ -851,9 +914,9 @@ CSV.write("data_2.csv", adf[1])
 
 #plot(adf.count_copepod, adf.count_grazer, adf.count_parasite, adf.count_phytoplankton, adf.count_copepodInf, adf.count_stickleback, adf.count_sticklebackInf)
 
-df = adf[1]
+##df = adf[1]
 
-names(df)
+##names(df)
 
 
 
