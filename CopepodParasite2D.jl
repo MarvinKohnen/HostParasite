@@ -7,9 +7,12 @@
 
 
 # TODO:
-# Energy gain copepod differ for phytoplankton and grazer (also maybe only prey on grazer?)
-# check movement of hunting agents (maybe only chase one agent not all)
+# Energy gain based on the prey energy status, currently set value
 # problems: stepping uses random agents -> we should use a rigid order?
+# ContinuousAgent -> Vel field
+# Improve movement (see flocking model)
+# Visualize 
+# Logging direction? Wtf
 
 #Changed: Stickleback instant reproduction and also only eats infected beings
 # Energy parasite high, amount of parasite high 
@@ -145,10 +148,12 @@ function initialize_model(;
     phytoplankton_mortality = 0.0001,
 
     # Movement rates 
-    copepod_vel = 1.3,
+    copepod_vel = 1.1,
     grazer_vel = 1.1,
     parasite_vel = 1.0,
     stickleback_vel = 1.4,
+
+    stickleback_eat_chance = 0.5,
 
     hatch_prob = 0.2, #probability for eggs to hatch, 20% as to Merles results (Parasite_eggs/hatching rates excel in Dropbox)
     seed = 23182,
@@ -195,6 +200,7 @@ function initialize_model(;
         :grazer_vel => grazer_vel,
         :parasite_vel => parasite_vel,
         :stickleback_vel => stickleback_vel,
+        :stickleback_eat_chance => stickleback_eat_chance,
         :dt => dt,
         :seed => seed,
     )
@@ -563,11 +569,12 @@ end
 
 
 
-function stickleback_step!(stickleback, model) 
-    #stickleback_infection!(stickleback, model)
+function stickleback_step!(stickleback, model)
+    @info("stepping stickleback with ID: " *string(stickleback.id)) 
     if (stickleback.infected == 1) && (rand(model.rng) <= stickleback.reproduction_prob) 
         parasite_reproduce!(model)
         stickleback.infected = 0
+        @info("Stickleback with ID: " * string(stickleback.id) * " is no longer infected")
     end
 
     if is_stationary(stickleback, model.pathfinder)
@@ -587,8 +594,33 @@ function stickleback_step!(stickleback, model)
 
     move_along_route!(stickleback, model, model.pathfinder, model.stickleback_vel, model.dt) 
 
-    stickleback_eat!(stickleback, model) 
+    if rand(model.rng) <= model.stickleback_eat_chance
+        @info(rand.model(rng))
+        stickleback_infection!(stickleback, model)
+        stickleback_eat!(stickleback, model) 
+    end 
     
+end
+function stickleback_infection!(stickleback, model)
+    
+    infection = [y for y in nearby_agents(stickleback, model, 1.01 *model.stickleback_vision) if y.infected == 1]
+    infection_possible = [y for y in nearby_agents(stickleback, model, model.stickleback_vision) if y.type == :copepod]
+    counter = 0
+    counter_p = 0 
+    for y in infection
+        counter += 1
+    end
+    for y in infection_possible
+        counter_p += 1
+    end
+    @info("infection array contained this many elements: " * string(counter))
+    @info("infection possible array contained this many elements: " * string(counter_p))
+    if !isempty(infection)
+        @info("Stickleback with ID: " * string(stickleback.id) * " got infected")
+        for y in infection
+            stickleback.infected = 1
+        end
+    end
 end
 
 function stickleback_eat!(stickleback, model)
@@ -599,10 +631,6 @@ function stickleback_eat!(stickleback, model)
         for x in eat
             counter += 1
             @info("This agent of type:" * string(x.type) * " and ID: " * string(x.id) * " at position" * string(x.pos) * " was eaten by Stickleback with ID: " * string(stickleback.id) * " at position" * string(stickleback.pos))
-            @info("Infection status was " * string(x.infected))
-            if x.infected == 1
-                stickleback.infected = 1
-            end
             remove_agent!(x, model, model.pathfinder)
         end
         @info("Stickleback with ID: " * string(stickleback.id) * "at position " * string(stickleback.pos) * "ate in total: " * string(counter) * " Agents")
@@ -779,8 +807,8 @@ function model_step!(model)
     K =  5000 # carrying capacity
     if n > K
 
-        overpopulation = n-K
-        @info("had to kill this many agents bc of overpopulation: " * string(overpopulation))
+        p_overpopulation = n-K
+        @info("had to kill this many agents bc of phyotplankton overpopulation: " * string(p_overpopulation))
         to_kill = rand(1:length(ids), n-K)
 
         for j in 1:length(to_kill)
@@ -843,7 +871,7 @@ sticklebackInf(a) = a.type ==:stickleback && a.infected == 1
 
 
 #main
-n= 60
+n= 80
 model = initialize_model()
 
 adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
