@@ -1,0 +1,8 @@
+function stickleback_infection!(stickleback, model)
+    infection = [y for y in nearby_agents(stickleback, model, model.stickleback_vision) if y.infected == 1]
+    if !isempty(infection)
+        stickleback.infected = 1
+        @info("Stickleback with ID: " * string(stickleback.id) * " got infected")
+        remove_agent!(y, model, model.pathfinder)
+    end
+end

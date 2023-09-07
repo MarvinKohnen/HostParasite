@@ -77,18 +77,17 @@ pwd()
 #cd("Dropbox/Jaime M/Projects_JM/Muenster/Marvin/project/HostParasite/HostParasite/")
 
 mutable struct CopepodGrazerParasitePhytoplankton <: AbstractAgent
-    id::Int #Id of the Agent
-    pos::NTuple{2, Float64} #position in the Space
-    type::Symbol # :Copepod or :Parasite or :Grazer or :Phytoplankton or :Stickleback
+    id::Int 
+    pos::NTuple{2, Float64} 
+    type::Symbol 
     energy::Float64 
-    reproduction_prob::Float64  
-    Δenergy::Float64
-    infected::Int   # 0 = false, 1 = true
+    reproduction_prob::Float64 
+    Δenergy::Float64 
+    infected::Int   
     infectiondays::Int
-    gender::Int  # 1 = female , 2 = male
+    gender::Int  
     fullness::Int 
     age::Int
-    # -> mean for Macrocyclops albidus: mean (+- SD) in mm: Females: 1.56 +- 0.097 ; males: 1.11 +- 0.093
 end
 
 function Copepod(id, pos, energy, repr, Δe)
@@ -111,40 +110,39 @@ function Stickleback(id, pos, repr, infected)
 end
 
 
-norm(vec) = √sum(vec .^ 2)
+eunorm(vec) = √sum(vec .^ 2)
 
 function initialize_model(;
-    n_copepod = 100, #30, #100
+    #initial amount of Agents
+    n_copepod = 100, 
     n_phytoplankton = 400, 
-    n_grazer = 160, #100 # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
-    n_parasite = 4000, #300 
+    n_grazer = 160, 
+    n_parasite = 4000,  
     n_stickleback = 10,
 
-    # Energy parameters
-    Δenergy_copepod = 30, #5 days
-    Δenergy_grazer = 30, #1 days
-    Δenergy_parasite = 50,# 4 days
+    # Energy gain on Predation
+    Δenergy_copepod = 30, 
+    Δenergy_grazer = 30, 
+    Δenergy_parasite = 50, 
     Δenergy_phytoplankton = 10,   
-    #Δenergy_stickleback = 96,
 
-    copepod_vision = 9,  # how far copepods can see grazer to hunt
-    grazer_vision = 1,  # how far grazer see phytoplankton to feed on
-    parasite_vision = 2,  # how far parasites can see copepods to stay in their general vicinity
-    stickleback_vision = 8, # location to location in grid = 1 
+    #Vision Radius 
+    copepod_vision = 6,  
+    grazer_vision = 1,  
+    parasite_vision = 2,  
+    stickleback_vision = 8,  
     
+    #Reproduction probability
     copepod_reproduce = 0.03,
     grazer_reproduce = 0.03,
     parasite_reproduce = 0, 
     phytoplankton_reproduce = 0.2,
-    stickleback_reproduce = 1.0, #once per day
-    
-    phytoplankton_energy = 0,
+    stickleback_reproduce = 1.0, 
 
     # Mortality rates per day
     copepod_mortality = 0.0001,
     grazer_mortality = 0.0001,
     phytoplankton_mortality = 0.0001,
-    #stickleback_mortality = 0.2,
 
     # Movement rates 
     copepod_vel = 1.3,
@@ -152,11 +150,11 @@ function initialize_model(;
     parasite_vel = 1.0,
     stickleback_vel = 1.4,
 
-    #stickleback_infected = rand((0,1)),
     hatch_prob = 0.2, #probability for eggs to hatch, 20% as to Merles results (Parasite_eggs/hatching rates excel in Dropbox)
     seed = 23182,
     dt = 1.0,
     )
+
 
     rng = MersenneTwister(seed) #MersenneTwister: pseudo random number generator
     space = ContinuousSpace((100., 100.); periodic = true)
@@ -164,6 +162,7 @@ function initialize_model(;
     heightmap_path = "WhiteSpace.jpg"
     heightmap = load(heightmap_path)
     dims = (size(heightmap))
+    @info("dims are " * string(dims))
     water_walkmap= BitArray(falses(dims))
  
 
@@ -376,11 +375,11 @@ function grazer_step!(grazer, model)
             position = grazer.pos .+ direction .* (model.grazer_vision / 2.)
             gchosen_position = random_walkable(position, model, model.pathfinder, model.grazer_vision / 2.)
         end
-        set_target!(grazer, gchosen_position, model.pathfinder)
+        plan_route!(grazer, gchosen_position, model.pathfinder)
     end 
 
     if is_stationary(grazer, model.pathfinder) && isempty(predators)
-        set_target!(
+        plan_route!(
             grazer,
             random_walkable(grazer.pos, model, model.pathfinder, model.grazer_vision),
             model.pathfinder
@@ -414,6 +413,143 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
         return
     end
     @info("infection status copepod: " * string(copepod.infected))
+    
+    if copepod.infectiondays <= 2#13 
+
+        #get an iterable of nearby prey and predators
+        prey = [g.pos for g in nearby_agents(copepod, model, model.copepod_vision) if g.type == :grazer]
+        cpredators = [s.pos for s in nearby_agents(copepod, model, model.copepod_vision) if s.type == :stickleback]
+       
+        #if there are predators nearby, override any other movement and flee from it 
+        if !isempty(cpredators) 
+            # Try and get an ideal direction away from predators
+            direction = (0., 0.)
+            for predator in cpredators
+                # Get the direction away from the predator
+                away_direction = (copepod.pos .- predator)
+                # In case there is already a predator at our location, moving anywhere is
+                # moving away from it, so it doesn't contribute to `direction`
+                all(away_direction .≈ 0.) && continue
+                # Add this to the overall direction, scaling inversely with distance.
+                # As a result, closer predators contribute more to the direction to move in
+                direction = direction .+ away_direction ./ eunorm(away_direction) ^ 2
+            end
+           
+            if all(direction .≈ 0.)
+
+                chosen_position = random_walkable(copeod.pos, model, model.pathfinder, model.copepod_vision)
+            else
+                
+                direction = direction ./ eunorm(direction)
+                
+                position = copepod.pos .+ direction .* (model.copepod_vision / 2.)
+                chosen_position = random_walkable(position, model, model.pathfinder, model.copepod_vision / 2.)
+            end
+            plan_route!(copepod, chosen_position, model.pathfinder)
+        end
+                
+        #only if there are no predators nearby, the copepod will look for prey
+        if !isempty(prey) && isempty(cpredators)
+            direction = (0., 0.)
+            for agent in prey
+                toward_direction = (copepod.pos .+ agent)
+                direction = direction .+ toward_direction ./ eunorm(toward_direction) ^ 2
+            end
+
+            if all(direction .≈ 0.)
+
+                chosen_position = random_walkable(copeod.pos, model, model.pathfinder, model.copepod_vision)
+            else
+                
+                direction = direction ./ eunorm(direction)
+                
+                position = copepod.pos .+ direction .* (model.copepod_vision / 2.)
+                chosen_position = random_walkable(position, model, model.pathfinder, model.copepod_vision / 2.)
+            end
+            plan_route!(copepod, chosen_position, model.pathfinder)
+        end
+
+        #if no prey and no predator nearby, move to a random location
+        if is_stationary(copepod, model.pathfinder)
+            plan_route!(
+                copepod,
+                random_walkable(copepod.pos, model, model.pathfinder, model.copepod_vision),
+                model.pathfinder,
+            )
+        end
+
+    # if the copepod is infected for more than 12 days 
+    else 
+        #get an iterable of nearby prey and predators
+        prey = [g.pos for g in nearby_agents(copepod, model, model.copepod_vision) if g.type == :grazer]
+        cpredators = [s.pos for s in nearby_agents(copepod, model, model.copepod_vision) if s.type == :stickleback]
+
+        if !isempty(cpredators) 
+            # Try and get an ideal direction away from predators
+            direction = (0., 0.)
+            for predator in cpredators
+                # Get the direction away from the predator
+                away_direction = (copepod.pos .- predator)
+                # In case there is already a predator at our location, moving anywhere is
+                # moving away from it, so it doesn't contribute to `direction`
+                all(away_direction .≈ 0.) && continue
+                # Add this to the overall direction, scaling inversely with distance.
+                # As a result, closer predators contribute more to the direction to move in
+                direction = direction .+ away_direction ./ eunorm(away_direction) ^ 2
+            end
+
+            #the infected copepod exudes risk behaviour
+            if !isempty(prey) 
+                direction = (0.,0.)
+                for agent in prey
+                    toward_direction = (copepod.pos .+ agent)
+                    direction = direction .+ toward_direction ./ eunorm(toward_direction) ^ 2
+                end
+            end 
+
+            if all(direction .≈ 0.)
+
+                chosen_position = random_walkable(copeod.pos, model, model.pathfinder, model.copepod_vision)
+            else
+                
+                direction = direction ./ eunorm(direction)
+                
+                position = copepod.pos .+ direction .* (model.copepod_vision / 2.)
+                chosen_position = random_walkable(position, model, model.pathfinder, model.copepod_vision / 2.)
+            end
+            plan_route!(copepod, chosen_position, model.pathfinder)
+        end
+
+        if !isempty(prey) && isempty(cpredators)
+            direction = (0.,0.)
+            for agent in prey
+                toward_direction = (copepod.pos .+ agent)
+                direction = direction .+ toward_direction ./ eunorm(toward_direction) ^ 2
+            end
+
+            if all(direction .≈ 0.)
+
+                chosen_position = random_walkable(copeod.pos, model, model.pathfinder, model.copepod_vision)
+            else
+                
+                direction = direction ./ eunorm(direction)
+                
+                position = copepod.pos .+ direction .* (model.copepod_vision / 2.)
+                chosen_position = random_walkable(position, model, model.pathfinder, model.copepod_vision / 2.)
+            end
+            plan_route!(copepod, chosen_position, model.pathfinder)
+        end
+
+        #if no prey and no predator nearby, move to a random location
+        if is_stationary(copepod, model.pathfinder)
+            plan_route!(
+                copepod,
+                random_walkable(copepod.pos, model, model.pathfinder, model.copepod_vision),
+                model.pathfinder,
+            )
+        end
+    end
+        
     if copepod.infected == 1
         move_along_route!(copepod, model, model.pathfinder, model.copepod_vel, model.dt)
         copepod_eat!(copepod, model)
@@ -421,166 +557,57 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
         @info("copepod with ID: " * string(copepod.id) * " is now infected for " * string(copepod.infectiondays) * "steps")
         copepod.energy -= model.dt
     end
-    
-    
-    if copepod.infectiondays <= 2#12 
-        prey = [x.pos for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :grazer]
-        cpredators = [x.pos for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :stickleback]
-        for predator in cpredators
-            @info("copepod with ID: " * string(copepod.id) * " is fleeing from the Stickleback with ID: " * string(predator.pos))
-        end
-        cdirection = (0., 0.)
-        caway_direction = (0.,0.)
-        if !isempty(cpredators) 
-            @info("This copepod with ID: " * string(copepod.id) * ", is fleeing from predators")
-            caway_direction = []
-            caway_direction = (copepod.pos .- cpredators[1]) 
-            chosen_position = random_walkable(caway_direction, model, model.pathfinder, model.copepod_vision / 2.)
-        end 
-        
-        ctoward_direction = (0.,0.)
-        if !isempty(prey)
-            ctoward_direction = []
-            for i in 1:length(prey)
-                if i == 1
-                    ctoward_direction = (copepod.pos .+ prey[i])
-                else
-                    ctoward_direction = ctoward_direction .+ prey[i]
-                end
-            end 
-        end
-            
-        if all(caway_direction .≈ 0.) #meaning the sticklebacks are on top of the copepod
-            #move anywhere
-            chosen_position = random_walkable(copepod.pos, model, model.pathfinder, model.copepod_vision) 
-        else
-            #Normalize the resultant direction and get the ideal position to move it
-            cdirection = cdirection ./norm(cdirection)
-            #move to a random position in the general direction away from predators and toward prey
-            cposition = copepod.pos .+ cdirection .* (model.copepod_vision / 2.)
-            chosen_position = random_walkable(cposition, model, model.pathfinder, model.copepod_vision / 2.)
-        end
-        set_target!(copepod, chosen_position, model.pathfinder)
-        
-        if isempty(prey) && isempty(cpredators)
-            #move anywhere if no prey nearby
-            set_target!(
-                copepod,
-                random_walkable(copepod.pos, model, model.pathfinder, model.copepod_vision),
-                model.pathfinder
-            )
-            return
-        end
 
-    else #if is_stationary(copepod, model.pathfinder)
-        prey = [x.pos for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :grazer]
-        cdirection = (0., 0.)
-        ctoward_direction = (0.,0.)
-        if !isempty(prey)
-            @info("This copepod with ID: " * string(copepod.id) * ", is hunting prey")
-            ctoward_direction = []
-            for i in 1:length(prey)
-                if i == 1
-                    ctoward_direction = (copepod.pos .+ prey[i])
-                else
-                    ctoward_direction = ctoward_direction .+ prey[i]
-                end
-            end 
-
-
-            cdirection = cdirection .+ ctoward_direction ./ norm(ctoward_direction) .^2   #set new direction 
-                
-            if all(cdirection .≈ 0.) #meaning the sticklebacks are on top of the copepod
-                #move anywhere
-                chosen_position = random_walkable(copepod.pos, model, model.pathfinder, model.copepod_vision) 
-            else
-                #Normalize the resultant direction and get the ideal position to move it
-                cdirection = cdirection ./norm(cdirection)
-                #move to a random position in the general direction away from predators and toward prey
-                cposition = copepod.pos .+ cdirection .* (model.copepod_vision / 2.) 
-                chosen_position = random_walkable(cposition, model, model.pathfinder, model.copepod_vision / 2.)
-            end
-            set_target!(copepod, chosen_position, model.pathfinder)
-        end 
-
-        if isempty(prey) 
-            #move anywhere if no prey nearby
-            set_target!(
-                copepod,
-                random_walkable(copepod.pos, model, model.pathfinder, model.copepod_vision),
-                model.pathfinder
-            )
-            return
-        end
-
-    move_along_route!(copepod, model, model.pathfinder, model.copepod_vel, model.dt)
-end 
+    move_along_route!(copepod, model, model.pathfinder, model.copepod_vel, model.dt) 
 end
 
+
+
 function stickleback_step!(stickleback, model) 
-    
-    hunt = [x.pos for x in nearby_agents(stickleback, model, model.stickleback_vision) if  (x.type == :copepod)]
-    if is_stationary(stickleback, model.pathfinder) && !isempty(hunt)
-        #@info("This Stickleback with Id: " * string(stickleback.id) * ", is hunting the following agents: " )
-        sdirection = (0., 0.)
-        
-        stoward_direction = []
-        for i in 1:length(hunt)
-
-            if i == 1
-                stoward_direction = (stickleback.pos .+ hunt[i])
-            else
-                stoward_direction = stoward_direction .+ hunt[i]
-            end
-            sdirection = sdirection .+ stoward_direction ./ norm(stoward_direction) ^2
-        end
-        
-        sdirection = sdirection ./ norm(sdirection)
-        sposition = stickleback.pos .+ sdirection .* (model.stickleback_vision / 2.)
-        schosen_position = random_walkable(sposition, model, model.pathfinder, model.stickleback_vision / 2.)
-        set_target!(stickleback, schosen_position, model.pathfinder)
-    end
-
-    if is_stationary(stickleback, model.pathfinder) && isempty(hunt)
-        set_target!(
-            stickleback,
-            random_walkable(stickleback.pos, model, model.pathfinder, model.stickleback_vision),
-            model.pathfinder
-        )
-        return
-    end
-    move_along_route!(stickleback, model, model.pathfinder, model.stickleback_vel, model.dt) 
-
-
-    stickleback_eat!(stickleback, model)  
+    #stickleback_infection!(stickleback, model)
     if (stickleback.infected == 1) && (rand(model.rng) <= stickleback.reproduction_prob) 
         parasite_reproduce!(model)
         stickleback.infected = 0
     end
+
+    if is_stationary(stickleback, model.pathfinder)
+        hunt = [x for x in nearby_agents(stickleback, model, model.stickleback_vision) if x.type == :copepod || x.type == :grazer]
+        if isempty(hunt)
+          
+            plan_route!(
+                stickleback,
+                random_walkable(stickleback.pos, model, model.pathfinder, model.stickleback_vision),
+                model.pathfinder,
+            )
+        else
+            # Move toward a random agent in hunt
+            plan_route!(stickleback, rand(model.rng, map(x -> x.pos, hunt)), model.pathfinder)
+        end   
+    end
+
+    move_along_route!(stickleback, model, model.pathfinder, model.stickleback_vel, model.dt) 
+
+    stickleback_eat!(stickleback, model) 
     
 end
 
-
 function stickleback_eat!(stickleback, model)
-    infection = [y for y in nearby_agents(stickleback, model, model.stickleback_vision) if y.infected == 1]
-    eat = [x for x in nearby_agents(stickleback, model, model.stickleback_vision) if x.type == :copepod || x.type == :grazer]
-    if !isempty(infection)
-        stickleback.infected = 1
-        @info("Stickleback with ID: " * string(stickleback.id) * "got infected")
-    end
 
+    eat = [x for x in nearby_agents(stickleback, model, model.stickleback_vision) if x.type == :copepod || x.type == :grazer]
     if !isempty(eat)
         counter = 0 
         for x in eat
             counter += 1
             @info("This agent of type:" * string(x.type) * " and ID: " * string(x.id) * " at position" * string(x.pos) * " was eaten by Stickleback with ID: " * string(stickleback.id) * " at position" * string(stickleback.pos))
+            @info("Infection status was " * string(x.infected))
+            if x.infected == 1
+                stickleback.infected = 1
+            end
             remove_agent!(x, model, model.pathfinder)
         end
         @info("Stickleback with ID: " * string(stickleback.id) * "at position " * string(stickleback.pos) * "ate in total: " * string(counter) * " Agents")
     end
-
-    
-end
+end 
 
 function copepod_eat!(copepod, model) 
     food = [x for x in nearby_agents(copepod, model, model.copepod_vision) if (x.type == :grazer)]# || (x.type == :phytoplankton)]
@@ -596,7 +623,6 @@ function copepod_eat!(copepod, model)
             copepod.energy += 5
         end
         @info("Copepod with ID: " * string(copepod.id) * "at position " * string(copepod.pos) * "ate in total: " * string(counter) * " grazer")
-
     end
 
 
@@ -604,7 +630,6 @@ function copepod_eat!(copepod, model)
     if !isempty(infection)
         for x in infection
             remove_agent!(x, model, model.pathfinder)
-            
             copepod.infected = 1
         end
         @info("This Copepod with ID: " * string(copepod.id) * " got infected")
@@ -717,7 +742,7 @@ function parasite_reproduce!(model)
     epg = 39247 .* dry_w .- 47 
     Δenergy_parasite = 96
     parasite_reproduce = 0
-    @info("amount of parasite eggs introduced: " * epg)
+    @info("amount of parasite eggs introduced: " * string(epg))
     for _ in 1:epg
         if rand(model.rng) <= model.hatch_prob
             id = nextid(model)
@@ -753,6 +778,9 @@ function model_step!(model)
     n = length(ids) 
     K =  5000 # carrying capacity
     if n > K
+
+        overpopulation = n-K
+        @info("had to kill this many agents bc of overpopulation: " * string(overpopulation))
         to_kill = rand(1:length(ids), n-K)
 
         for j in 1:length(to_kill)
@@ -784,7 +812,7 @@ end
 function acolor(a)
     if a.type == :copepod
         :black 
-    elseif a.infected == 1  #what else is there to try? 
+    elseif a.infected == 1  
         :red
     elseif a.type == :grazer 
         :yellow
