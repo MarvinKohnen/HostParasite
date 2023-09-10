@@ -7,8 +7,6 @@
 
 
 # TODO:
-# Energy gain based on the prey energy status
-# copepod infected only eat grazer
 
 # Visualize 
 
@@ -133,15 +131,15 @@ function initialize_model(;
     feeding_rate = 1,
 
     #Vision Radius 
-    copepod_vision = 4,  
+    copepod_vision = 3,  
     grazer_vision = 2,  
-    stickleback_vision = 6,  
+    stickleback_vision = 5,  
     parasite_vision = 1,
     
     #Reproduction probability
     copepod_reproduce = 0.14,
     grazer_reproduce = 0.4, 
-    phytoplankton_reproduce = 0.6,
+    phytoplankton_reproduce = 0.6, 
     stickleback_reproduce = 1.0, 
     parasite_reproduce = 0, 
 
@@ -295,11 +293,11 @@ function agent_step!(agent::CopepodGrazerParasitePhytoplankton, model)  #agent
     elseif agent.type == :parasite
         @info("now stepping agent of type parasite with ID: " * string(agent.id))
         parasite_step!(agent, model)
-        
+
     elseif agent.type == :stickleback
         @info("now stepping agent of type Stickleback with ID: " * string(agent.id))
         stickleback_step!(agent, model)
-        
+
     else 
         @info("now stepping agent of type phytoplankton with ID: " * string(agent.id))
         phytoplankton_step!(agent, model)
@@ -340,7 +338,7 @@ function grazer_step!(grazer, model)
     @info("This Grazer with ID: " * string(grazer.id) * " has now this much energy left: " * string(grazer.energy) * ", because model.dt was: " * string(model.dt))
     if grazer.energy < 0
         remove_agent!(grazer, model, model.pathfinder)
-        @info("This Grazer with ID: " * string(grazer.id) * " died of energy loss  at model step: " * string(model.model_step_counter))
+        @info("This Grazer with ID: " * string(grazer.id) * " died of energyloss  at model step: " * string(model.model_step_counter))
         return
     end
     if rand(model.rng) < model.grazer_mortality
@@ -666,8 +664,8 @@ function stickleback_step!(stickleback, model)
 end
 function stickleback_infection!(stickleback, model)
     
-    infection = [y for y in nearby_agents(stickleback, model, 1.01 *model.stickleback_vision) if y.infected == 1]
-    infection_possible = [y for y in nearby_agents(stickleback, model, model.stickleback_vision) if y.type == :copepod]
+    infection = [y for y in nearby_agents(stickleback, model, 1.01 * model.stickleback_vision) if y.infected == 1]
+    infection_possible = [y for y in nearby_agents(stickleback, model, 1.01 * model.stickleback_vision) if y.type == :copepod]
     counter = 0
     counter_p = 0 
     for y in infection
@@ -688,12 +686,12 @@ end
 
 function stickleback_eat!(stickleback, model)
 
-    eat = [x for x in nearby_agents(stickleback, model, model.stickleback_vision) if x.type == :copepod || x.type == :grazer]
+    eat = [x for x in nearby_agents(stickleback, model) if x.type == :copepod || x.type == :grazer]
     if !isempty(eat)
         counter = 0 
         for x in eat
             counter += 1
-            @info("This agent of type:" * string(x.type) * " and ID: " * string(x.id) * " at position" * string(x.pos) * " was eaten by Stickleback with ID: " * string(stickleback.id) * " at position" * string(stickleback.pos) * " at model step: " * string(model.model_step_counter) * " at age: " * string(x.age))
+            @info("This agent of type:" * string(x.type) * " with ID: " * string(x.id) * " at position" * string(x.pos) * " was eaten by Stickleback with ID: " * string(stickleback.id) * " at position" * string(stickleback.pos) * " at model step: " * string(model.model_step_counter) * " at age: " * string(x.age))
             remove_agent!(x, model, model.pathfinder)
         end
         @info("Stickleback with ID: " * string(stickleback.id) * "at position " * string(stickleback.pos) * "ate in total: " * string(counter) * " Agents")
@@ -701,14 +699,12 @@ function stickleback_eat!(stickleback, model)
 end 
 
 function copepod_eat!(copepod, model) 
-    food = [x for x in nearby_agents(copepod, model, model.copepod_vision) if (x.type == :grazer) || (x.type == :phytoplankton)]
+    food = [x for x in nearby_agents(copepod, model) if (x.type == :grazer) || (x.type == :phytoplankton)]
     if !isempty(food)  
         counter = 0
         for x in food 
-
-
             if copepod.fullness >= 10
-                @info("Copepod with ID " * string(copepod.id) * "is full and wont be eating any more grazers")
+                @info("Copepod with I: " * string(copepod.id) * "is full and wont be eating any more grazers")
                 return
             end 
 
@@ -717,18 +713,17 @@ function copepod_eat!(copepod, model)
                 copepod.fullness += 1 
                 counter +=1
                 remove_agent!(x, model, model.pathfinder)
-                @info("This agent of type:" * string(x.type) * " and ID: " * string(x.id) * " at position" * string(x.pos) * " was eaten by Copepod with ID: " * string(copepod.id) * " at position" * string(copepod.pos) * " at model step: " * string(model.model_step_counter) * " at age: " * string(x.age))
+                @info("This agent of type:" * string(x.type) * " with ID: " * string(x.id) * " at position" * string(x.pos) * " was eaten by Copepod with ID: " * string(copepod.id) * " at position" * string(copepod.pos) * " at model step: " * string(model.model_step_counter) * " at age: " * string(x.age))
             end
 
             if x.type == :phytoplankton
                 if copepod.infected == 1 
                     @info("copepod is infected and ignores phytoplankton") 
-
                 else 
                     copepod.energy += copepod.Δenergy
                     counter +=1
                     remove_agent!(x, model, model.pathfinder)
-                    @info("This agent of type:" * string(x.type) * " and ID: " * string(x.id) * " at position" * string(x.pos) * " was eaten by Copepod with ID: " * string(copepod.id) * " at position" * string(copepod.pos) * " at model step: " * string(model.model_step_counter) * " at age: " * string(x.age))
+                    @info("This agent of type:" * string(x.type) * " with ID: " * string(x.id) * " at position" * string(x.pos) * " was eaten by Copepod with ID: " * string(copepod.id) * " at position" * string(copepod.pos) * " at model step: " * string(model.model_step_counter) * " at age: " * string(x.age))
                 end
             end
 
@@ -737,7 +732,7 @@ function copepod_eat!(copepod, model)
     end
 
 
-    infection = [x for x in nearby_agents(copepod, model, model.copepod_vision) if x.type == :parasite]
+    infection = [x for x in nearby_agents(copepod, model) if x.type == :parasite]
     if !isempty(infection)
         for x in infection
             remove_agent!(x, model, model.pathfinder)
@@ -755,7 +750,7 @@ function grazer_eat!(grazer, model)
             counter +=1
             grazer.energy += grazer.Δenergy
             remove_agent!(x, model, model.pathfinder)
-            @info("Grazer with ID: " * string(grazer.id) * "at position " * string(grazer.pos) * "ate phytoplankton at pos: " * string(x.pos) * " at model step: " * string(model.model_step_counter))
+            @info("Grazer with ID: " * string(grazer.id) * "at position " * string(grazer.pos) * "ate phytoplankton with ID: " * string(x.id) * " at pos: " * string(x.pos) * " at model step: " * string(model.model_step_counter))
         end
         @info("Grazer with ID: " * string(grazer.id) * "at position " * string(grazer_pos) * "ate in total: " * string(counter) * " phytoplankton")
     end
@@ -822,23 +817,24 @@ end
 
 function phytoplankton_reproduce!(phytoplankton, model) 
    
-    phytoplankton.energy /= 2
-    
-    id = nextid(model)
-    offspring = Phytoplankton(
-        id,
-        random_walkable(random_position(model),model, model.pathfinder),
-        0,
-        phytoplankton.reproduction_prob,
-        phytoplankton.Δenergy,
-    )
-    x = offspring.id
-    y = offspring.pos
-        
-    @info("Added new Phytoplankton to model with ID: " * string(x) * ", at pos: " * string(y) * "at model step: " * string(model.model_step_counter))
-    add_agent_pos!(offspring, model)
-    Agents.remove_agent!(phytoplankton, model)
-    return
+    for i in 1:rand(1:10)
+
+        id = nextid(model)
+        offspring = Phytoplankton(
+            id,
+            random_walkable(random_position(model),model, model.pathfinder),
+            0,
+            phytoplankton.reproduction_prob,
+            phytoplankton.Δenergy,
+        )
+        x = offspring.id
+        y = offspring.pos
+            
+        @info("Added new Phytoplankton to model with ID: " * string(x) * ", at pos: " * string(y) * "at model step: " * string(model.model_step_counter))
+        add_agent_pos!(offspring, model)
+        Agents.remove_agent!(phytoplankton, model)
+        return
+    end
 end
 
 function parasite_reproduce!(model)
@@ -948,7 +944,7 @@ sticklebackInf(a) = a.type ==:stickleback && a.infected == 1
 
 
 #main
-n= 60
+n= 10
 model = initialize_model()
 
 adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
