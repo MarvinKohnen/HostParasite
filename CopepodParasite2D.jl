@@ -112,7 +112,7 @@ function initialize_model(;
     n_copepod = 100, 
     n_phytoplankton = 400, 
     n_grazer = 200, 
-    n_parasite = 4000,  
+    n_parasite = 0, #4000,  
     n_stickleback = 20, 
 
     #starting energy 
@@ -774,8 +774,8 @@ function copepod_eat!(copepod, model)
         for x in infection
             remove_agent!(x, model, model.pathfinder)
             copepod.infected = 1
+            @info("This Copepod with ID: " * string(copepod.id) * " got infected by Parasite with ID: " * string(x.id))
         end
-        @info("This Copepod with ID: " * string(copepod.id) * " got infected by Parasite with ID: " * string(Parasite.id))
     end
 end
 
@@ -996,7 +996,7 @@ sticklebackInf(a) = a.type ==:stickleback && a.infected == 1
 
 
 #main
-n= 10
+n = 2
 model = initialize_model()
 
 adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
@@ -1006,8 +1006,11 @@ close(io)
 
 show(adf, allrows=true)
 
+using CSV
 
+adf
 
+CSV.write("data.csv", adf)
 
 # params = Dict(
 #     :n_copepod =>  [1, 300, 500]  ,#collect(0:100:500), # 
@@ -1100,11 +1103,6 @@ show(adf, allrows=true)
 ####println(adf[1])
 
 
-## Save results
-using CSV, DataFrames
-# write out a DataFrame to csv file
-CSV.write("data_2.csv", adf[1])
-#CSV.write("/scratch/tmp/janayaro/My_projects/Copepod/data_2.csv", adf[1])
 
 
 
