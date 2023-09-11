@@ -1101,10 +1101,10 @@ show(adf, allrows=true)
 
 
 ## Save results
-#####using CSV, DataFrames
+using CSV, DataFrames
 # write out a DataFrame to csv file
-#####CSV.write("data_2.csv", adf[1])
-# CSV.write("/scratch/tmp/janayaro/My_projects/Copepod/data_2.csv", adf[1])
+CSV.write("data_2.csv", adf[1])
+#CSV.write("/scratch/tmp/janayaro/My_projects/Copepod/data_2.csv", adf[1])
 
 
 
