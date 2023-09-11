@@ -131,14 +131,14 @@ function initialize_model(;
     feeding_rate = 1,
 
     #Vision Radius
-    copepod_vision = 3,
-    grazer_vision = 2,
-    stickleback_vision = 5,
+    copepod_vision = 10,
+    grazer_vision = 10,
+    stickleback_vision = 10,
     parasite_vision = 1,
 
     #Reproduction probability
     copepod_reproduce = 0.14,
-    grazer_reproduce = 0.25, 
+    grazer_reproduce = 0.14, 
     phytoplankton_reproduce = 0.15, 
     stickleback_reproduce = 1.0, 
     parasite_reproduce = 0, 
@@ -796,7 +796,7 @@ end
 
 function grazer_reproduce!(grazer, model) 
         
-    for _ in 1:rand(1:6)
+    for _ in 1:rand(1:4)
         id = nextid(model)
         offspring = CopepodGrazerParasitePhytoplankton(
             id,
@@ -825,7 +825,7 @@ end
 # add time to grow up: mean time to maturity for Macrocyclops albidus: 19.5 days 
 function copepod_reproduce!(copepod, model) 
 
-    for _ in 1:(rand(1:3))#(rand(Normal(92, 5))) 
+    for _ in 1:(rand(1:4))#(rand(Normal(92, 5))) 
         id = nextid(model)
         offspring = CopepodGrazerParasitePhytoplankton(
             id,
