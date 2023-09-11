@@ -1,5 +1,4 @@
 step,count_grazer,count_parasite,count_phytoplankton,count_copepod,count_copepodInf,count_stickleback,count_sticklebackInf
 0,200,0,400,100,0,20,0
 1,199,0,421,100,0,20,0
-2,237,0,458,123,0,20,0
-3,266,0,498,148,0,20,0
+2,232,0,460,120,0,20,0

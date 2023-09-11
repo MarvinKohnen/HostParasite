@@ -996,7 +996,7 @@ sticklebackInf(a) = a.type ==:stickleback && a.infected == 1
 
 
 #main
-n = 2
+n = 30
 model = initialize_model()
 
 adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
@@ -1004,7 +1004,7 @@ adf = run!(model, agent_step!, model_step!, n; adata)
 adf = adf[1]
 close(io)
 
-show(adf, allrows=true)
+show(adf, allrows=true, allcols=true)
 
 using CSV
 
