@@ -113,7 +113,7 @@ function initialize_model(;
     n_phytoplankton = 400, 
     n_grazer = 200, 
     n_parasite = 0, #4000,  
-    n_stickleback = 20, 
+    n_stickleback = 0,#20, 
 
     #starting energy 
     starting_energy_copepod = 5,
