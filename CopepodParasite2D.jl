@@ -113,12 +113,12 @@ function initialize_model(;
     n_phytoplankton = 400, 
     n_grazer = 300, 
     n_parasite = 4000,  
-    n_stickleback = 10,
+    n_stickleback = 20,
 
     #starting energy 
     starting_energy_copepod = 5,
     starting_energy_grazer = 5,
-    starting_energy_parasite = 5,
+    starting_energy_parasite = 10,
 
     # Energy gain on Phytoplankton kill 
     Δenergy_copepod = 0.1, 
@@ -600,7 +600,7 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
 
             #the infected copepod exudes risk behaviour
             if !isempty(prey) 
-                direction = (0.,0.)
+                direction = (0.,0.,0.)
                 for agent in prey
                     toward_direction = (copepod.pos .+ agent)
                     direction = direction .+ toward_direction ./ eunorm(toward_direction) ^ 2
@@ -621,7 +621,7 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
         end
 
         if !isempty(prey) && isempty(cpredators)
-            direction = (0.,0.)
+            direction = (0.,0.,0.)
             for agent in prey
                 toward_direction = (copepod.pos .+ agent)
                 direction = direction .+ toward_direction ./ eunorm(toward_direction) ^ 2
@@ -1034,6 +1034,7 @@ Plots.plot(t, (adf.count_copepod), lab = "Copepods")
 plot!(t, (adf.count_phytoplankton), lab = "Phytoplankton")
 plot!(t, (adf.count_grazer), lab = "Grazers")
 plot!(t, (adf.count_stickleback), lab = "Fish")
+plot!(t, (adf.count_parasite), lab = "Parasite")
 Plots.ylims!(0,1000)
 
 
