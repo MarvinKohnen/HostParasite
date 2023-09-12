@@ -97,8 +97,8 @@ function Grazer(id, pos, energy, repr, Δe)
     CopepodGrazerParasitePhytoplankton(id, pos, :grazer, energy, repr, Δe, 0, 0, rand(1:2), 0,0)
 end
 
-function Phytoplankton(id, pos, energy, repr, Δe)
-    CopepodGrazerParasitePhytoplankton(id, pos, :phytoplankton, energy, repr, Δe, 0, 0, 1, 0,0)
+function Phytoplankton(id, pos, energy, repr, Δe, age)
+    CopepodGrazerParasitePhytoplankton(id, pos, :phytoplankton, energy, repr, Δe, 0, 0, 1, 0,age)
 end 
 
 function Stickleback(id, pos, repr, infected)
@@ -111,9 +111,9 @@ function initialize_model(;
     #initial amount of Agents
     n_copepod = 100, 
     n_phytoplankton = 400, 
-    n_grazer = 200, 
+    n_grazer = 300, 
     n_parasite = 0, #4000,  
-    n_stickleback = 0,#20, 
+    n_stickleback = 0,#10, 
 
     #starting energy 
     starting_energy_copepod = 5,
@@ -137,9 +137,9 @@ function initialize_model(;
     parasite_vision = 1,
 
     #Reproduction probability
-    copepod_reproduce = 0.14,
-    grazer_reproduce = 0.14, 
-    phytoplankton_reproduce = 0.15, 
+    copepod_reproduce = 0.2,
+    grazer_reproduce = 0.2, 
+    phytoplankton_reproduce = 0.14, #0.10
     stickleback_reproduce = 1.0, 
     parasite_reproduce = 0, 
 
@@ -292,6 +292,7 @@ function initialize_model(;
                 rand(Δenergy_phytoplankton:2*Δenergy_phytoplankton),
                 phytoplankton_reproduce,
                 Δenergy_phytoplankton,
+                rand(1:8)
             ),
             model,
         )
@@ -326,6 +327,12 @@ function phytoplankton_step!(phytoplankton, model)
         @info("Phytoplankton with ID: " * string(phytoplankton.id) * " died of mortality at model step: " *string(model.model_step_counter))
         return
     end
+
+    phytoplankton.age += 1
+
+    if phytoplankton.age >= 10
+        remove_agent!(phytoplankton, model)
+    end 
 
     if rand(model.rng) <= model.phytoplankton_reproduce * model.dt
         phytoplankton_reproduce!(phytoplankton, model)
@@ -861,6 +868,7 @@ function phytoplankton_reproduce!(phytoplankton, model)
         0,
         phytoplankton.reproduction_prob,
         phytoplankton.Δenergy,
+        0
     )
     x = offspring.id
     y = offspring.pos
@@ -996,7 +1004,7 @@ sticklebackInf(a) = a.type ==:stickleback && a.infected == 1
 
 
 #main
-n = 30
+n = 60
 model = initialize_model()
 
 adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
@@ -1011,6 +1019,24 @@ using CSV
 adf
 
 CSV.write("data.csv", adf)
+
+
+# Plotting for Thesis
+using Plots
+
+
+
+t = adf.step 
+
+
+
+Plots.plot(t, (adf.count_copepod), lab = "Copepods")
+plot!(t, (adf.count_phytoplankton), lab = "Phytoplankton")
+plot!(t, (adf.count_grazer), lab = "Grazers")
+plot!(t, (adf.count_stickleback), lab = "Fish")
+Plots.ylims!(0,600)
+
+
 
 # params = Dict(
 #     :n_copepod =>  [1, 300, 500]  ,#collect(0:100:500), # 
@@ -1106,32 +1132,7 @@ CSV.write("data.csv", adf)
 
 
 
-# n=60
-# model = initialize_model()
-# adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
-# adf = run!(model, agent_step!, model_step!, n; adata)
-# adf = adf[1]
-# show(adf, allrows=true)
 
-
-#plot(adf.count_copepod, adf.count_grazer, adf.count_parasite, adf.count_phytoplankton, adf.count_copepodInf, adf.count_stickleback, adf.count_sticklebackInf)
-
-#df = adf[1]
-
-##names(df)
-
-
-
-
-
-#t = adf[1].step ./ 24
-
-#using Plots
-
-#Plots.plot(t, (df.count_phytoplankton), lab = "Phytoplankton")
-#plot!(t, (df.count_copepod), lab = "Copepods")
-#plot!(t, (adf.count_grazer), lab = "Grazers")
-#plot!(t, (adf.count_stickleback), lab = "Fish")
 
 
 #global sensitivity -> ensemblerun  : https://github.com/SciML/GlobalSensitivity.jl
