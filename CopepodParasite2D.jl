@@ -112,8 +112,8 @@ function initialize_model(;
     n_copepod = 100, 
     n_phytoplankton = 400, 
     n_grazer = 300, 
-    n_parasite = 0, #4000,  
-    n_stickleback = 10,#10, 
+    n_parasite = 4000,  
+    n_stickleback = 10,
 
     #starting energy 
     starting_energy_copepod = 5,
@@ -137,7 +137,7 @@ function initialize_model(;
     parasite_vision = 1,
 
     #Reproduction probability
-    copepod_reproduce = 0.2,
+    copepod_reproduce = 0.15,
     grazer_reproduce = 0.2, 
     phytoplankton_reproduce = 0.14, #0.10
     stickleback_reproduce = 1.0, 
