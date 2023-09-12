@@ -109,16 +109,16 @@ eunorm(vec) = √sum(vec .^ 2)
 
 function initialize_model(;
     #initial amount of Agents
-    n_copepod = 100, 
+    n_copepod = 150, 
     n_phytoplankton = 400, 
     n_grazer = 300, 
-    n_parasite = 4000,  
+    n_parasite = 2000,  
     n_stickleback = 20,
 
     #starting energy 
     starting_energy_copepod = 5,
     starting_energy_grazer = 5,
-    starting_energy_parasite = 10,
+    starting_energy_parasite = 15,
 
     # Energy gain on Phytoplankton kill 
     Δenergy_copepod = 0.1, 
@@ -127,7 +127,7 @@ function initialize_model(;
     Δenergy_phytoplankton = 0, 
 
     #feeding rate
-    infected_feeding_rate = 2,
+    infected_feeding_rate = 4,
     feeding_rate = 1,
 
     #Vision Radius
@@ -533,7 +533,7 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
            
             if all(direction .≈ 0.)
 
-                chosen_position = random_walkable(copeod.pos, model, model.pathfinder, model.copepod_vision)
+                chosen_position = random_walkable(copepod.pos, model, model.pathfinder, model.copepod_vision)
             else
                 
                 direction = direction ./ eunorm(direction)
@@ -775,15 +775,19 @@ function copepod_eat!(copepod, model)
         @info("Copepod with ID: " * string(copepod.id) * "at position " * string(copepod.pos) * "ate in total: " * string(counter) * " grazer")
     end
 
-
-    infection = [x for x in nearby_agents(copepod, model) if x.type == :parasite]
-    if !isempty(infection)
-        for x in infection
-            remove_agent!(x, model, model.pathfinder)
-            copepod.infected = 1
-            @info("This Copepod with ID: " * string(copepod.id) * " got infected by Parasite with ID: " * string(x.id))
+    if copepod.infected == 0
+        copepod_infection_prob = 0.3
+        infection = [x for x in nearby_agents(copepod, model) if x.type == :parasite]
+        if !isempty(infection)
+            for x in infection
+                if rand(model.rng) <= copepod_infection_prob
+                    remove_agent!(x, model, model.pathfinder)
+                    copepod.infected = 1
+                    @info("This Copepod with ID: " * string(copepod.id) * " got infected by Parasite with ID: " * string(x.id))
+                end 
+            end
         end
-    end
+    end 
 end
 
 function grazer_eat!(grazer, model)        
@@ -1035,7 +1039,8 @@ plot!(t, (adf.count_phytoplankton), lab = "Phytoplankton")
 plot!(t, (adf.count_grazer), lab = "Grazers")
 plot!(t, (adf.count_stickleback), lab = "Fish")
 plot!(t, (adf.count_parasite), lab = "Parasite")
-Plots.ylims!(0,1000)
+plot!(t, (adf.count_copepodInf), lab = "Infected Copepod")
+Plots.ylims!(0,600)
 
 
 
