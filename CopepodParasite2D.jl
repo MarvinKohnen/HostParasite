@@ -113,7 +113,7 @@ function initialize_model(;
     n_phytoplankton = 400, 
     n_grazer = 300, 
     n_parasite = 0, #4000,  
-    n_stickleback = 0,#10, 
+    n_stickleback = 10,#10, 
 
     #starting energy 
     starting_energy_copepod = 5,
@@ -1034,7 +1034,7 @@ Plots.plot(t, (adf.count_copepod), lab = "Copepods")
 plot!(t, (adf.count_phytoplankton), lab = "Phytoplankton")
 plot!(t, (adf.count_grazer), lab = "Grazers")
 plot!(t, (adf.count_stickleback), lab = "Fish")
-Plots.ylims!(0,600)
+Plots.ylims!(0,1000)
 
 
 
