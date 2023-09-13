@@ -1020,7 +1020,7 @@ show(adf, allrows=true, allcols=true)
 
 using CSV
 
-CSV.write("datainitial.csv", adf)
+CSV.write("/scratch/tmp/janayaro/datainitial.csv", adf)
 
 # Plotting for Thesis
 #using Plots
@@ -1089,7 +1089,7 @@ adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, co
 bdf = paramscan(params, initialize_model; adata, agent_step!, model_step!, n = 60)
 
 
-CSV.write("dataParamscan.csv", bdf)
+CSV.write("/scratch/tmp/janayaro/dataParamscan.csv", bdf)
 
 show(bdf, allrows=true, allcols=true)
 
