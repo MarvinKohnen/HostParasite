@@ -1020,122 +1020,78 @@ show(adf, allrows=true, allcols=true)
 
 using CSV
 
-adf
-
-CSV.write("data.csv", adf)
-
+CSV.write("datainitial.csv", adf)
 
 # Plotting for Thesis
-using Plots
+#using Plots
+
+#t = adf.step 
+
+#Plots.plot(t, (adf.count_copepod), lab = "Copepods")
+#plot!(t, (adf.count_phytoplankton), lab = "Phytoplankton")
+#plot!(t, (adf.count_grazer), lab = "Grazers")
+#plot!(t, (adf.count_stickleback), lab = "Fish")
+#plot!(t, (adf.count_parasite), lab = "Parasite")
+#plot!(t, (adf.count_copepodInf), lab = "Infected Copepod")
+#Plots.ylims!(0,600)
+
+
+params = Dict(
+        :n_copepod => 150, 
+        :n_phytoplankton => 400, 
+        :n_grazer => 300,
+        :n_parasite => 2000,
+        :n_stickleback => 20,
+        :Δenergy_copepod =>  0.1,
+        :Δenergy_grazer => 0.2,
+        :Δenergy_parasite => 0,
+        :Δenergy_phytoplankton => 0,
+        :copepod_vision => 10,
+        :grazer_vision => 10,
+        :parasite_vision => 1,
+        :stickleback_vision => 10,
+        :copepod_reproduce => 0.15,
+        :grazer_reproduce => 0.2,
+        :stickleback_reproduce => 1.0,
+        :phytoplankton_reproduce => 0.14,
+        :parasite_reproduce => 0,
+        :hatch_prob => 0.2,
+        :copepod_mortality => 0.0001,
+        :grazer_mortality => 0.0001,
+        :phytoplankton_mortality => 0.0001,
+        :copepod_vel => 1.2,
+        :copepod_infected_vel => collect(1.0:0.1:1.5),
+        :grazer_vel => 1.1,
+        :parasite_vel => 1.0,
+        :stickleback_vel => 1.4,
+        :stickleback_eat_chance => collect(0.5:0.1:0.7),
+        :starting_energy_copepod => 5,
+        :starting_energy_parasite => 15,
+        :starting_energy_grazer => 5,
+        :feeding_rate => 1,
+        :infected_feeding_rate => collect(2:10),
+        :dt => 1.0,
+        :seed => rand(UInt8, 1),
+        :model_step_counter => 0,
+        :grazers_born => 0,
+        :copepods_born => 0,
+        :phytoplankton_born => 0, 
+        :copepods_eaten => 0,
+        :grazers_eaten => 0,
+        :phytoplankton_eaten => 0,
+        :grazers_energyloss => 0,
+        :copepods_energyloss => 0
+)
 
 
 
-t = adf.step 
+adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
+bdf = paramscan(params, initialize_model; adata, agent_step!, model_step!, n = 60)
 
 
+CSV.write("dataParamscan.csv", bdf)
 
-Plots.plot(t, (adf.count_copepod), lab = "Copepods")
-plot!(t, (adf.count_phytoplankton), lab = "Phytoplankton")
-plot!(t, (adf.count_grazer), lab = "Grazers")
-plot!(t, (adf.count_stickleback), lab = "Fish")
-plot!(t, (adf.count_parasite), lab = "Parasite")
-plot!(t, (adf.count_copepodInf), lab = "Infected Copepod")
-Plots.ylims!(0,600)
-
-
-
-# params = Dict(
-#     :n_copepod =>  [1, 300, 500]  ,#collect(0:100:500), # 
-#     :n_phytoplankton =>  3000,  #collect(1000:500:4000), 
-#     :n_grazer =>  300,  #collect(1:100:500), # Grazer being Chydoridae, Daphniidae and Sididae (All Branchiopoda)
-#     :n_parasite => 2000, #collect(1:1000:3000),
-#     :n_stickleback => 100, #[1:10:40],
-#     :Δenergy_copepod => 24*5,
-#     :Δenergy_grazer => 24,
-#     :Δenergy_parasite => 24*4,
-#     #Δenergy_stickleback = Δenergy_stickleback,
-#     :copepod_vision => 4,
-#     :grazer_vision => 2,
-#     :parasite_vision => 1,
-#     :stickleback_vision => 8, #[4, 6, 8, 10],  #best to always alter one? 
-#     :copepod_reproduce => (1/(24)),
-#     :grazer_reproduce => (1/(24)),
-#     :parasite_reproduce => 0, 
-#     :stickleback_reproduce => 0.8,
-#     :phytoplankton_reproduce => (1/(24)),
-#     :copepod_age => 0,
-#     :grazer_age => 0,
-#     :parasite_age => 0,
-#     :copepod_size => 1,
-#     :grazer_size => 1,
-#     :parasite_size => 1,
-#     :stickleback_size => 3,
-#     :phytoplankton_age => 0,
-#     :phytoplankton_energy => 0,
-#     :hatch_prob => 0.2,
-#     :copepod_mortality => (1/24)*0.05,
-#     :grazer_mortality => (1/24)*0.1,
-#     :phytoplankton_mortality => (1/24) * 0.01,
-#     #stickleback_mortality = stickleback_mortality,
-#     :copepod_vel => 0.5,
-#     :grazer_vel => 0.25,
-#     :parasite_vel => 0.1,
-#     :stickleback_vel => 0.7, #[0.5, 0.6, 0.7],
-#     #:stickleback_infected => rand((0,1))
-#     :dt => 1.0,
-#     :seed => rand(UInt8, 1),
-# )
-
-
-# params = Dict(
-#     :n_copepod => [300], 
-#     :n_phytoplankton => 3000, 
-#     :n_grazer => 300,
-#     :n_parasite => 2000,
-#     :n_stickleback => 100,
-#     :Δenergy_copepod => 24 * 5,
-#     :Δenergy_grazer => 24,
-#     :Δenergy_parasite => 24 * 4,
-#     :copepod_vision => 4,
-#     :grazer_vision => 2,
-#     :parasite_vision => 1,
-#     :stickleback_vision => 8,
-#     :copepod_reproduce => 1 / 24,
-#     :grazer_reproduce => 1 / 24,
-#     :parasite_reproduce => 0, 
-#     :stickleback_reproduce => 0.8,
-#     :phytoplankton_reproduce => 1 / 24,
-#     :copepod_age => 0,
-#     :grazer_age => 0,
-#     :parasite_age => 0,
-#     :copepod_size => 1,
-#     :grazer_size => 1,
-#     :parasite_size => 1,
-#     :stickleback_size => 3,
-#     :phytoplankton_age => 0,
-#     :phytoplankton_energy => 0,
-#     :hatch_prob => 0.2,
-#     :copepod_mortality => (1 / 24) * 0.05,
-#     :grazer_mortality => (1 / 24) * 0.1,
-#     :phytoplankton_mortality => (1 / 24) * 0.01,
-#     :copepod_vel => 0.5,
-#     :grazer_vel => 0.25,
-#     :parasite_vel => 0.1,
-#     :stickleback_vel => 0.7,
-#     :dt => 1.0,
-#     :seed => rand(UInt8, 1),
-# )
-
-###adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
-###adf = paramscan(params, initialize_model; adata, agent_step!, model_step!, n = 5)
-
-###adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
-###adf = paramscan(params, initialize_model; adata, agent_step!, model_step!, n = 24) 
-
-####println(adf[1])
-
-
-
+show(bdf, allrows=true, allcols=true)
 
 
 
