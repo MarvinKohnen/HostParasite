@@ -175,7 +175,7 @@ function initialize_model(;
 
     rng = MersenneTwister(seed) #MersenneTwister: pseudo random number generator
     space = ContinuousSpace((100., 100., 50.); periodic = true)
-    heightmap_path = "WhiteSpace.jpg"
+    heightmap_path = "home/j/janayaro/Marvin/HostParasite/WhiteSpace.jpg"
     heightmap = load(heightmap_path)
     dims = (size(heightmap)..., 50)
     @info("dims are " * string(dims))
