@@ -39,9 +39,9 @@
 #8: https://link.springer.com/content/pdf/10.1007/BF00006104.pdf
 #9 https://www.nature.com/articles/s41598-019-51705-9 for functional stuff and 5 eatings per day 
 
-# using Pkg
+using Pkg
 
-# Pkg.add(["Random", "Agents", "FileIO", "Distributions", "InteractiveDynamics", "Images", "ImageMagick", "DataFrames"])
+Pkg.add(["Random", "Agents", "FileIO", "Distributions", "InteractiveDynamics", "Images", "ImageMagick", "DataFrames", "Logging", "Plots", "CSV"])
 
 using Random
 using Agents
