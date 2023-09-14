@@ -178,7 +178,7 @@ function initialize_model(;
     heightmap_path = "/home/j/janayaro/Marvin/HostParasite/WhiteSpace.jpg"
     heightmap = load(heightmap_path)
     dims = (size(heightmap)..., 50)
-    @info("dims are " * string(dims))
+    #@info("dims are " * string(dims))
     water_walkmap= BitArray(trues(dims))
     
 
@@ -302,21 +302,21 @@ end
     
 function agent_step!(agent::CopepodGrazerParasitePhytoplankton, model)  #agent
     if agent.type == :grazer 
-        @info("now stepping agent of type grazer with ID: " * string(agent.id))
+        #@info("now stepping agent of type grazer with ID: " * string(agent.id))
         grazer_step!(agent, model)
     elseif agent.type == :copepod 
-        @info("now stepping agent of type copepod with ID: " * string(agent.id))
+        #@info("now stepping agent of type copepod with ID: " * string(agent.id))
         copepod_step!(agent, model)
     elseif agent.type == :parasite
-        @info("now stepping agent of type parasite with ID: " * string(agent.id))
+        #@info("now stepping agent of type parasite with ID: " * string(agent.id))
         parasite_step!(agent, model)
 
     elseif agent.type == :stickleback
-        @info("now stepping agent of type Stickleback with ID: " * string(agent.id))
+        #@info("now stepping agent of type Stickleback with ID: " * string(agent.id))
         stickleback_step!(agent, model)
 
     else 
-        @info("now stepping agent of type phytoplankton with ID: " * string(agent.id))
+        #@info("now stepping agent of type phytoplankton with ID: " * string(agent.id))
         phytoplankton_step!(agent, model)
     end
 end
@@ -324,7 +324,7 @@ end
 function phytoplankton_step!(phytoplankton, model)
     if rand(model.rng) < model.phytoplankton_mortality
         remove_agent!(phytoplankton, model, model.pathfinder)
-        @info("Phytoplankton with ID: " * string(phytoplankton.id) * " died of mortality at model step: " *string(model.model_step_counter))
+        #@info("Phytoplankton with ID: " * string(phytoplankton.id) * " died of mortality at model step: " *string(model.model_step_counter))
         return
     end
 
@@ -341,46 +341,55 @@ end
     
 function parasite_step!(parasite, model) 
     parasite.energy -= 1
-    @info("This parasite with ID: " * string(parasite.id) * " has this much energy left: " * string(parasite.energy))
+    #@info("This parasite with ID: " * string(parasite.id) * " has this much energy left: " * string(parasite.energy))
     if parasite.energy < 0
         remove_agent!(parasite, model, model.pathfinder)
-        @info("This grazer with ID: " * string(parasite.id) * " has this much energy left: " * string(parasite.energy))
+        #@info("This grazer with ID: " * string(parasite.id) * " has this much energy left: " * string(parasite.energy))
         return
     end
-    walk!(parasite, rand, model) #periodic = false
+
+    if is_stationary(parasite, model.pathfinder) 
+        plan_route!(
+            parasite,
+            random_walkable(parasite.pos, model, model.pathfinder, model.parasite_vision),
+            model.pathfinder
+        )
+        return
+    end
+    move_along_route!(parasite, model, model.pathfinder, model.parasite_vel, model.dt) 
 end
 
 
 function grazer_step!(grazer, model)
-    @info("This Grazer with ID: " * string(grazer.id) * " has this much energy left: " * string(grazer.energy))
+    #@info("This Grazer with ID: " * string(grazer.id) * " has this much energy left: " * string(grazer.energy))
     if grazer.energy <= 20
-        @info("This Grazer called grazer_eat! with ID: " * string(grazer.id) * ", since he has this much energy left: " * string(grazer.energy))
+        #@info("This Grazer called grazer_eat! with ID: " * string(grazer.id) * ", since he has this much energy left: " * string(grazer.energy))
         grazer_eat!(grazer, model)
     end
     grazer.energy -=model.dt
-    @info("This Grazer with ID: " * string(grazer.id) * " has now this much energy left: " * string(grazer.energy) * ", because model.dt was: " * string(model.dt))
+    #@info("This Grazer with ID: " * string(grazer.id) * " has now this much energy left: " * string(grazer.energy) * ", because model.dt was: " * string(model.dt))
     if grazer.energy < 0
         remove_agent!(grazer, model, model.pathfinder)
-        @info("This Grazer with ID: " * string(grazer.id) * " died of energyloss  at model step: " * string(model.model_step_counter))
+        #@info("This Grazer with ID: " * string(grazer.id) * " died of energyloss  at model step: " * string(model.model_step_counter))
         model.grazers_energyloss += 1
         return
     end
 
     if rand(model.rng) < model.grazer_mortality
         remove_agent!(grazer, model, model.pathfinder)
-        @info("This grazer with ID: " * string(grazer.id) * " died of mortality  at model step:" * string(model.model_step_counter))
+        #@info("This grazer with ID: " * string(grazer.id) * " died of mortality  at model step:" * string(model.model_step_counter))
         return
     end
     
     if rand(model.rng) <= grazer.reproduction_prob * model.dt && grazer.gender == 1 && grazer.age >= 1
-        @info("This grazer with ID: " * string(grazer.id) * " reproduced at model step: " * string(model.model_step_counter))
+        #@info("This grazer with ID: " * string(grazer.id) * " reproduced at model step: " * string(model.model_step_counter))
         grazer_reproduce!(grazer, model)
     end
         
     predators = [x.pos for x in nearby_agents(grazer, model, model.grazer_vision) if x.type == :copepod || x.type == :stickleback]
 
     if !isempty(predators) && is_stationary(grazer, model.pathfinder)
-        @info("This grazer with ID: " * string(grazer.id) * " is fleeing from predators")
+        #@info("This grazer with ID: " * string(grazer.id) * " is fleeing from predators")
         direction = (0., 0., 0.)
         away_direction = []
         for i in eachindex(predators)
@@ -423,25 +432,25 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
     copepod.age += 1
     if rand(model.rng) < model.copepod_mortality
         remove_agent!(copepod, model, model.pathfinder)
-        @info("This copepod with ID: " * string(copepod.id) * " died of Mortality  at model step:" * string(model.model_step_counter))
+        #@info("This copepod with ID: " * string(copepod.id) * " died of Mortality  at model step:" * string(model.model_step_counter))
         return
     end
 
     if rand(model.rng) <= copepod.reproduction_prob * model.dt && copepod.infected == 0 && copepod.gender == 1 && copepod.age >= 2
-        @info("This Copepod with ID: " * string(copepod.id) * " reproduced at model step: " * string(model.model_step_counter))
+        #@info("This Copepod with ID: " * string(copepod.id) * " reproduced at model step: " * string(model.model_step_counter))
         copepod_reproduce!(copepod, model)
     end
 
     if copepod.energy <= 3
-        @info("This Copepod called copepod_eat! with ID: " * string(copepod.id) * ", since he has this much energy left: " * string(copepod.energy))
+        #@info("This Copepod called copepod_eat! with ID: " * string(copepod.id) * ", since he has this much energy left: " * string(copepod.energy))
         copepod_eat!(copepod, model)
     end
     copepod.energy -= model.dt
-    @info("This Copepod with ID: " * string(copepod.id) * ", has now this much energy left " * string(copepod.energy))
+    #@info("This Copepod with ID: " * string(copepod.id) * ", has now this much energy left " * string(copepod.energy))
     
     if copepod.energy < 0
         remove_agent!(copepod, model, model.pathfinder)
-        @info("This Copepod with ID: " * string(copepod.id) * ", died of energyloss at model step: " * string(model.model_step_counter))
+        #@info("This Copepod with ID: " * string(copepod.id) * ", died of energyloss at model step: " * string(model.model_step_counter))
         model.copepods_energyloss += 1
         return
     end
@@ -576,7 +585,7 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
         end
         copepod_eat!(copepod, model)
         copepod.infectiondays +=1
-        @info("copepod with ID: " * string(copepod.id) * " is now infected for " * string(copepod.infectiondays) * "steps")
+        #@info("copepod with ID: " * string(copepod.id) * " is now infected for " * string(copepod.infectiondays) * "steps")
 
     # if the copepod is infected for more than 12 days 
     else 
@@ -651,7 +660,7 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
         move_along_route!(copepod, model, model.pathfinder, model.copepod_infected_vel, model.dt) 
         copepod_eat!(copepod, model)
         copepod.infectiondays +=1
-        @info("copepod with ID: " * string(copepod.id) * " is now infected for " * string(copepod.infectiondays) * "steps")
+        #@info("copepod with ID: " * string(copepod.id) * " is now infected for " * string(copepod.infectiondays) * "steps")
     end
 
 end
@@ -659,11 +668,11 @@ end
 
 
 function stickleback_step!(stickleback, model)
-    @info("stepping stickleback with ID: " *string(stickleback.id)) 
+    #@info("stepping stickleback with ID: " *string(stickleback.id)) 
     if (stickleback.infected == 1) && (rand(model.rng) <= stickleback.reproduction_prob) 
         parasite_reproduce!(model)
         stickleback.infected = 0
-        @info("Stickleback with ID: " * string(stickleback.id) * " is no longer infected")
+        #@info("Stickleback with ID: " * string(stickleback.id) * " is no longer infected")
     end
 
     if is_stationary(stickleback, model.pathfinder)
@@ -701,10 +710,10 @@ function stickleback_infection!(stickleback, model)
     for y in infection_possible
         counter_p += 1
     end
-    @info("infection array contained this many elements: " * string(counter))
-    @info("infection possible array contained this many elements: " * string(counter_p))
+    #@info("infection array contained this many elements: " * string(counter))
+    #@info("infection possible array contained this many elements: " * string(counter_p))
     if !isempty(infection)
-        @info("Stickleback with ID: " * string(stickleback.id) * " got infected")
+        #@info("Stickleback with ID: " * string(stickleback.id) * " got infected")
         for y in infection
             stickleback.infected = 1
         end
@@ -718,7 +727,7 @@ function stickleback_eat!(stickleback, model)
         counter = 0 
         for x in eat
             counter += 1
-            @info("This agent of type:" * string(x.type) * " with ID: " * string(x.id) * " at position" * string(x.pos) * " was eaten by Stickleback with ID: " * string(stickleback.id) * " at position" * string(stickleback.pos) * " at model step: " * string(model.model_step_counter) * " at age: " * string(x.age))
+            #@info("This agent of type:" * string(x.type) * " with ID: " * string(x.id) * " at position" * string(x.pos) * " was eaten by Stickleback with ID: " * string(stickleback.id) * " at position" * string(stickleback.pos) * " at model step: " * string(model.model_step_counter) * " at age: " * string(x.age))
             remove_agent!(x, model, model.pathfinder)
             if x.type == :copepod
                 model.copepods_eaten +=1 
@@ -727,7 +736,7 @@ function stickleback_eat!(stickleback, model)
                 model.grazers_eaten += 1
             end 
         end
-        @info("Stickleback with ID: " * string(stickleback.id) * "at position " * string(stickleback.pos) * "ate in total: " * string(counter) * " Agents")
+        #@info("Stickleback with ID: " * string(stickleback.id) * "at position " * string(stickleback.pos) * "ate in total: " * string(counter) * " Agents")
     end
 end 
 
@@ -746,7 +755,7 @@ function copepod_eat!(copepod, model)
         for x in food 
 
             if copepod.fullness >= 10
-                @info("Copepod with I: " * string(copepod.id) * "is full and wont be eating any more grazers")
+                #@info("Copepod with I: " * string(copepod.id) * "is full and wont be eating any more grazers")
                 return
             end 
 
@@ -756,23 +765,23 @@ function copepod_eat!(copepod, model)
                 model.grazers_eaten += 1
                 counter +=1
                 remove_agent!(x, model, model.pathfinder)
-                @info("This agent of type:" * string(x.type) * " with ID: " * string(x.id) * " at position" * string(x.pos) * " was eaten by Copepod with ID: " * string(copepod.id) * " at position" * string(copepod.pos) * " at model step: " * string(model.model_step_counter) * " at prey age: " * string(x.age) * "and Copepod gained " * string(x.energy*0.5) * " energy")
+                #@info("This agent of type:" * string(x.type) * " with ID: " * string(x.id) * " at position" * string(x.pos) * " was eaten by Copepod with ID: " * string(copepod.id) * " at position" * string(copepod.pos) * " at model step: " * string(model.model_step_counter) * " at prey age: " * string(x.age) * "and Copepod gained " * string(x.energy*0.5) * " energy")
             end
 
             if x.type == :phytoplankton
                 if copepod.infected == 1 
-                    @info("copepod is infected and ignores phytoplankton") 
+                    #@info("copepod is infected and ignores phytoplankton") 
                 else 
                     copepod.energy += copepod.Δenergy
                     counter +=1
                     model.phytoplankton_eaten += 1 
                     remove_agent!(x, model, model.pathfinder)
-                    @info("This agent of type:" * string(x.type) * " with ID: " * string(x.id) * " at position" * string(x.pos) * " was eaten by Copepod with ID: " * string(copepod.id) * " at position" * string(copepod.pos) * " at model step: " * string(model.model_step_counter) * " at age: " * string(x.age))
+                    #@info("This agent of type:" * string(x.type) * " with ID: " * string(x.id) * " at position" * string(x.pos) * " was eaten by Copepod with ID: " * string(copepod.id) * " at position" * string(copepod.pos) * " at model step: " * string(model.model_step_counter) * " at age: " * string(x.age))
                 end
             end
 
         end
-        @info("Copepod with ID: " * string(copepod.id) * "at position " * string(copepod.pos) * "ate in total: " * string(counter) * " grazer")
+        #@info("Copepod with ID: " * string(copepod.id) * "at position " * string(copepod.pos) * "ate in total: " * string(counter) * " grazer")
     end
 
     if copepod.infected == 0
@@ -783,7 +792,7 @@ function copepod_eat!(copepod, model)
                 if rand(model.rng) <= copepod_infection_prob
                     remove_agent!(x, model, model.pathfinder)
                     copepod.infected = 1
-                    @info("This Copepod with ID: " * string(copepod.id) * " got infected by Parasite with ID: " * string(x.id))
+                    #@info("This Copepod with ID: " * string(copepod.id) * " got infected by Parasite with ID: " * string(x.id))
                 end 
             end
         end
@@ -799,9 +808,9 @@ function grazer_eat!(grazer, model)
             counter +=1
             grazer.energy += grazer.Δenergy
             remove_agent!(x, model, model.pathfinder)
-            @info("Grazer with ID: " * string(grazer.id) * "at position " * string(grazer.pos) * " ate phytoplankton with ID: " * string(x.id) * " at pos: " * string(x.pos) * " at model step: " * string(model.model_step_counter))
+            #@info("Grazer with ID: " * string(grazer.id) * "at position " * string(grazer.pos) * " ate phytoplankton with ID: " * string(x.id) * " at pos: " * string(x.pos) * " at model step: " * string(model.model_step_counter))
         end
-        @info("Grazer with ID: " * string(grazer.id) * "at position " * string(grazer.pos) * " ate in total: " * string(counter) * " phytoplankton")
+        #@info("Grazer with ID: " * string(grazer.id) * "at position " * string(grazer.pos) * " ate in total: " * string(counter) * " phytoplankton")
     end
 end
 
@@ -826,7 +835,7 @@ function grazer_reproduce!(grazer, model)
     y = offspring.pos
     
     model.grazers_born += 1
-    @info("Added new Grazer to model with ID: " * string(x) * ", at pos: " * string(y) * "at model step: " * string(model.model_step_counter))
+    #@info("Added new Grazer to model with ID: " * string(x) * ", at pos: " * string(y) * "at model step: " * string(model.model_step_counter))
     add_agent_pos!(offspring, model)
     end
     return
@@ -854,7 +863,7 @@ function copepod_reproduce!(copepod, model)
         x = offspring.id
         y = offspring.pos
         
-        @info("Added new Copepod to model with ID: " * string(x) * ", at pos: " * string(y) * "at model step: " * string(model.model_step_counter))
+        #@info("Added new Copepod to model with ID: " * string(x) * ", at pos: " * string(y) * "at model step: " * string(model.model_step_counter))
         add_agent_pos!(offspring, model)
         model.copepods_born += 1
     end
@@ -878,7 +887,7 @@ function phytoplankton_reproduce!(phytoplankton, model)
     y = offspring.pos
     
     model.phytoplankton_born += 1
-    @info("Added new Phytoplankton to model with ID: " * string(x) * ", at pos: " * string(y) * "at model step: " * string(model.model_step_counter))
+    #@info("Added new Phytoplankton to model with ID: " * string(x) * ", at pos: " * string(y) * "at model step: " * string(model.model_step_counter))
     add_agent_pos!(offspring, model)
     return
 end
@@ -888,7 +897,7 @@ function parasite_reproduce!(model)
     epg = 39247 .* dry_w .- 47 
     parasite_reproduce = 0
     Δenergy_parasite = 0
-    @info("amount of parasite eggs introduced: " * string(epg))
+    #@info("amount of parasite eggs introduced: " * string(epg))
     for _ in 1:epg
         if rand(model.rng) <= model.hatch_prob
             id = nextid(model)
@@ -902,7 +911,7 @@ function parasite_reproduce!(model)
             x = egg.id
             y = egg.pos
         
-            @info("Added new Parasite to model with ID: " * string(x) * ", at pos: " * string(y) * "at model step: " * string(model.model_step_counter))
+            #@info("Added new Parasite to model with ID: " * string(x) * ", at pos: " * string(y) * "at model step: " * string(model.model_step_counter))
             add_agent!(egg, model)
         end
     end
@@ -913,15 +922,15 @@ end
 
 function model_step!(model)
 
-    @info("There were this many phytoplankton born: " * string(model.phytoplankton_born) * " at model step: " * string(model.model_step_counter))
-    @info("There were this many phytoplankton eaten: " * string(model.phytoplankton_eaten) * " at model step: " * string(model.model_step_counter))
-    @info("There were this many grazer born: " * string(model.grazers_born) * " at model step: " * string(model.model_step_counter))
-    @info("There were this many grazer eaten: " * string(model.grazers_eaten) * " at model step: " * string(model.model_step_counter))
-    @info("There were this many grazer killed by energyloss: " * string(model.grazers_energyloss) * " at model step: " * string(model.model_step_counter))
-    @info("There were this many copepod born: " * string(model.copepods_born) * " at model step: " * string(model.model_step_counter))
-    @info("There were this many copepod eaten: " * string(model.copepods_eaten) * " at model step: " * string(model.model_step_counter)) 
-    @info("There were this many copepod killed by energyloss: " * string(model.copepods_energyloss) * " at model step: " * string(model.model_step_counter))
-    @info("Advancing the model one step!")
+    #@info("There were this many phytoplankton born: " * string(model.phytoplankton_born) * " at model step: " * string(model.model_step_counter))
+    #@info("There were this many phytoplankton eaten: " * string(model.phytoplankton_eaten) * " at model step: " * string(model.model_step_counter))
+    #@info("There were this many grazer born: " * string(model.grazers_born) * " at model step: " * string(model.model_step_counter))
+    #@info("There were this many grazer eaten: " * string(model.grazers_eaten) * " at model step: " * string(model.model_step_counter))
+    #@info("There were this many grazer killed by energyloss: " * string(model.grazers_energyloss) * " at model step: " * string(model.model_step_counter))
+    #@info("There were this many copepod born: " * string(model.copepods_born) * " at model step: " * string(model.model_step_counter))
+    #@info("There were this many copepod eaten: " * string(model.copepods_eaten) * " at model step: " * string(model.model_step_counter)) 
+    #@info("There were this many copepod killed by energyloss: " * string(model.copepods_energyloss) * " at model step: " * string(model.model_step_counter))
+    #@info("Advancing the model one step!")
     model.model_step_counter +=1 
     model.phytoplankton_born = 0
     model.phytoplankton_eaten = 0
@@ -945,7 +954,7 @@ function model_step!(model)
     if n > K
 
         p_overpopulation = n-K
-        @info("had to kill this many agents bc of phyotplankton overpopulation: " * string(p_overpopulation))
+        #@info("had to kill this many agents bc of phyotplankton overpopulation: " * string(p_overpopulation))
         to_kill = rand(1:length(ids), n-K)
 
         for j in 1:length(to_kill)
@@ -1005,8 +1014,6 @@ phytoplankton(a) = a.type == :phytoplankton
 stickleback(a) = a.type == :stickleback
 sticklebackInf(a) = a.type ==:stickleback && a.infected == 1
 
-
-
 #main
 n = 60
 model = initialize_model()
@@ -1019,7 +1026,7 @@ close(io)
 show(adf, allrows=true, allcols=true)
 
 using CSV
-
+#CSV.write("datainitial.csv", adf)
 CSV.write("/scratch/tmp/janayaro/datainitial.csv", adf)
 
 # Plotting for Thesis
@@ -1064,7 +1071,7 @@ params = Dict(
         :grazer_vel => 1.1,
         :parasite_vel => 1.0,
         :stickleback_vel => 1.4,
-        :stickleback_eat_chance => collect(0.5:0.1:0.7),
+        :stickleback_eat_chance => 0.5,
         :starting_energy_copepod => 5,
         :starting_energy_parasite => 15,
         :starting_energy_grazer => 5,
@@ -1083,15 +1090,13 @@ params = Dict(
         :copepods_energyloss => 0
 )
 
-
-
 adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
 bdf = paramscan(params, initialize_model; adata, agent_step!, model_step!, n = 60)
-
-
+bdf = bdf[1]
+#CSV.write("dataParamscan.csv", bdf)
 CSV.write("/scratch/tmp/janayaro/dataParamscan.csv", bdf)
 
-show(bdf, allrows=true, allcols=true)
+
 
 
 
