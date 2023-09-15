@@ -498,7 +498,7 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
 
             if all(direction .≈ 0.)
 
-                chosen_position = random_walkable(copeod.pos, model, model.pathfinder, model.copepod_vision)
+                chosen_position = random_walkable(copepod.pos, model, model.pathfinder, model.copepod_vision)
 
             else
                 
@@ -563,7 +563,7 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
 
             if all(direction .≈ 0.)
 
-                chosen_position = random_walkable(copeod.pos, model, model.pathfinder, model.copepod_vision)
+                chosen_position = random_walkable(copepod.pos, model, model.pathfinder, model.copepod_vision)
 
             else
                 
@@ -618,7 +618,7 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
 
             if all(direction .≈ 0.)
 
-                chosen_position = random_walkable(copeod.pos, model, model.pathfinder, model.copepod_vision)
+                chosen_position = random_walkable(copepod.pos, model, model.pathfinder, model.copepod_vision)
             else
                 
                 direction = direction ./ eunorm(direction)
@@ -638,7 +638,7 @@ function copepod_step!(copepod, model) #Copepod is able to detect pray at 1mm (p
 
             if all(direction .≈ 0.)
 
-                chosen_position = random_walkable(copeod.pos, model, model.pathfinder, model.copepod_vision)
+                chosen_position = random_walkable(copepod.pos, model, model.pathfinder, model.copepod_vision)
             else
                 
                 direction = direction ./ eunorm(direction)
