@@ -1067,7 +1067,7 @@ params = Dict(
         :grazer_mortality => 0.0001,
         :phytoplankton_mortality => 0.0001,
         :copepod_vel => 1.2,
-        :copepod_infected_vel => collect(1.0:0.1:1.5),
+        :copepod_infected_vel => [1.0, 1.5],
         :grazer_vel => 1.1,
         :parasite_vel => 1.0,
         :stickleback_vel => 1.4,
@@ -1076,7 +1076,7 @@ params = Dict(
         :starting_energy_parasite => 15,
         :starting_energy_grazer => 5,
         :feeding_rate => 1,
-        :infected_feeding_rate => collect(2:10),
+        :infected_feeding_rate => [2, 10],
         :dt => 1.0,
         :seed => rand(UInt8, 1),
         :model_step_counter => 0,
@@ -1094,7 +1094,11 @@ adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, co
 bdf = paramscan(params, initialize_model; adata, agent_step!, model_step!, n = 60)
 bdf = bdf[1]
 #CSV.write("dataParamscan.csv", bdf)
-CSV.write("/scratch/tmp/janayaro/dataParamscan.csv", bdf)
+number = rand(1:2000)
+print("/scratch/tmp/janayaro/dataParamscan" * string(number) * ".csv")
+CSV.write("/scratch/tmp/janayaro/dataParamscan" * string(number) * ".csv", bdf)
+
+
 
 
 
