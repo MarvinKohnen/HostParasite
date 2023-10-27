@@ -39,9 +39,6 @@
 #8: https://link.springer.com/content/pdf/10.1007/BF00006104.pdf
 #9 https://www.nature.com/articles/s41598-019-51705-9 for functional stuff and 5 eatings per day 
 
-using Pkg
-
-Pkg.add(["Random", "Agents", "FileIO", "Distributions", "InteractiveDynamics", "Images", "ImageMagick", "DataFrames", "Logging", "Plots", "CSV"])
 
 using Random
 using Agents
@@ -55,6 +52,7 @@ using Images #use for url load
 using ImageMagick
 using DataFrames
 using Logging 
+using CSV
 
 #Open new file to log
 io = open("CopepodLogging.txt", "w+")
@@ -69,7 +67,7 @@ flush(io)
 global_logger(logger)
 
 
-pwd()
+#pwd()
 #cd("Dropbox/Jaime M/Projects_JM/Muenster/Marvin/project/HostParasite/HostParasite/")
 
 mutable struct CopepodGrazerParasitePhytoplankton <: AbstractAgent
@@ -112,7 +110,7 @@ function initialize_model(;
     n_copepod = 150, 
     n_phytoplankton = 400, 
     n_grazer = 300, 
-    n_parasite = 2000,  
+    n_parasite = 0,  
     n_stickleback = 20,
 
     #starting energy 
@@ -175,7 +173,7 @@ function initialize_model(;
 
     rng = MersenneTwister(seed) #MersenneTwister: pseudo random number generator
     space = ContinuousSpace((100., 100., 50.); periodic = true)
-    heightmap_path = "/home/j/janayaro/Marvin/HostParasite/WhiteSpace.jpg"
+    heightmap_path = "WhiteSpace.jpg"
     heightmap = load(heightmap_path)
     dims = (size(heightmap)..., 50)
     #@info("dims are " * string(dims))
@@ -1022,90 +1020,60 @@ adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, co
 adf = run!(model, agent_step!, model_step!, n; adata)
 adf = adf[1]
 close(io)
-
+CSV.write("dataGrazerCopepodPhytoPlanktonStickleback.csv", adf)
 show(adf, allrows=true, allcols=true)
 
-using CSV
-#CSV.write("datainitial.csv", adf)
-CSV.write("/scratch/tmp/janayaro/datainitial.csv", adf)
+using PlotlyJS
 
-# Plotting for Thesis
-#using Plots
+x = adf.step
+y = [0, 100,200,300, 400, 500, 600, 700, 800, 900]
 
-#t = adf.step 
-
-#Plots.plot(t, (adf.count_copepod), lab = "Copepods")
-#plot!(t, (adf.count_phytoplankton), lab = "Phytoplankton")
-#plot!(t, (adf.count_grazer), lab = "Grazers")
-#plot!(t, (adf.count_stickleback), lab = "Fish")
-#plot!(t, (adf.count_parasite), lab = "Parasite")
-#plot!(t, (adf.count_copepodInf), lab = "Infected Copepod")
-#Plots.ylims!(0,600)
-
-
-params = Dict(
-        :n_copepod => 150, 
-        :n_phytoplankton => 400, 
-        :n_grazer => 300,
-        :n_parasite => 2000,
-        :n_stickleback => 20,
-        :Δenergy_copepod =>  0.1,
-        :Δenergy_grazer => 0.2,
-        :Δenergy_parasite => 0,
-        :Δenergy_phytoplankton => 0,
-        :copepod_vision => 10,
-        :grazer_vision => 10,
-        :parasite_vision => 1,
-        :stickleback_vision => 10,
-        :copepod_reproduce => 0.15,
-        :grazer_reproduce => 0.2,
-        :stickleback_reproduce => 1.0,
-        :phytoplankton_reproduce => 0.14,
-        :parasite_reproduce => 0,
-        :hatch_prob => 0.2,
-        :copepod_mortality => 0.0001,
-        :grazer_mortality => 0.0001,
-        :phytoplankton_mortality => 0.0001,
-        :copepod_vel => 1.2,
-        :copepod_infected_vel => [1.0, 1.5],
-        :grazer_vel => 1.1,
-        :parasite_vel => 1.0,
-        :stickleback_vel => 1.4,
-        :stickleback_eat_chance => 0.5,
-        :starting_energy_copepod => 5,
-        :starting_energy_parasite => 15,
-        :starting_energy_grazer => 5,
-        :feeding_rate => 1,
-        :infected_feeding_rate => [2, 10],
-        :dt => 1.0,
-        :seed => rand(UInt8, 1),
-        :model_step_counter => 0,
-        :grazers_born => 0,
-        :copepods_born => 0,
-        :phytoplankton_born => 0, 
-        :copepods_eaten => 0,
-        :grazers_eaten => 0,
-        :phytoplankton_eaten => 0,
-        :grazers_energyloss => 0,
-        :copepods_energyloss => 0
+traces=[
+    scatter(
+        name = "Copepods",
+        x=x,
+        y=adf.count_copepod,
+        line=attr(color="rgb(52,94,235)"),
+        mode="lines"
+    )
+    scatter(
+        name = "Grazers",
+        x=x,
+        y=adf.count_grazer,
+        line=attr(color="rgb(235,229,52)"),
+        mode="lines"
+    )
+    scatter(
+        name = "Phytoplankton",
+        x=x,
+        y=adf.count_phytoplankton,
+        line=attr(color="rgb(52,235,88)"),
+        mode="lines"
+    )
+    scatter(
+        name = "Stickleback",
+        x=x,
+        y=adf.count_stickleback,
+        line=attr(color="rgb(235,70,52)"),
+        mode="lines"
+    )
+]
+layout = Layout(
+    legend=attr(
+        x=1,
+        y=1.00,
+        yanchor="bottom",
+        xanchor="right",
+        orientation="h"
+    ),
+    title="Base model",
+    xaxis_title="Steps",
+    yaxis_title="Population Size",
+    paper_bgcolor="white",
+    plot_bgcolor="white",  
+    yaxis = attr(range=[0, 750])
 )
-
-adata = [(grazer, count), (parasite, count), (phytoplankton, count),(copepod, count), (copepodInf, count), (stickleback, count), (sticklebackInf, count)]
-bdf = paramscan(params, initialize_model; adata, agent_step!, model_step!, n = 60)
-bdf = bdf[1]
-#CSV.write("dataParamscan.csv", bdf)
-number = rand(1:2000)
-CSV.write("/scratch/tmp/janayaro/dataParamscan" * string(number) * ".csv", bdf)
-
-
-
-
-
-
-
-
-
-#global sensitivity -> ensemblerun  : https://github.com/SciML/GlobalSensitivity.jl
-#Salib py - sobol julia
+plot(traces, layout)
+    
 
 
