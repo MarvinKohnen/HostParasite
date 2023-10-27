@@ -1021,7 +1021,12 @@ adf = run!(model, agent_step!, model_step!, n; adata)
 adf = adf[1]
 close(io)
 CSV.write("dataGrazerCopepodPhytoPlanktonSticklebackParasite.csv", adf)
-show(adf, allrows=true, allcols=true)
+
+
+
+
+# Load the CSV file
+adf = CSV.File("dataGrazerCopepodPhytoPlanktonSticklebackParasite.csv") |> DataFrame
 
 using PlotlyJS
 
@@ -1058,13 +1063,6 @@ traces=[
         mode="lines"
     )
     scatter(
-        name = "Parasite",
-        x=x,
-        y=adf.count_parasite,
-        line=attr(color="rgb(235,52,225)"),
-        mode="lines"
-    )
-    scatter(
         name = "Infected Copepod ",
         x=x,
         y=adf.count_copepodInf,
@@ -1080,7 +1078,7 @@ layout = Layout(
         xanchor="right",
         orientation="h"
     ),
-    title="Base model",
+    title="Full model",
     xaxis_title="Steps",
     yaxis_title="Population Size",
     paper_bgcolor="white",

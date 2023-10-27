@@ -4,7 +4,7 @@ using Statistics
 
 
 # Load the CSV file
-data = CSV.File("dataLowEnd.csv") |> DataFrame
+data = CSV.File("Data/dataLowEnd.csv") |> DataFrame
 
 # Group the data by the 'step' column and calculate the mean and std for 'count_copepod'
 groupedDF = combine(groupby(data, :step), :count_copepod => mean, :count_copepod => std, :count_copepodInf => mean, :count_copepodInf => std, :count_grazer => mean, :count_grazer => std, :count_parasite => mean, :count_parasite => std, :count_phytoplankton => mean, :count_phytoplankton => std)
@@ -96,23 +96,6 @@ traces=[
         fill="toself",
         fillcolor="rgba(235,229,52,0.2)",
         line=attr(color="rgba(235,229,52,0)"),
-        hoverinfo="skip",
-        showlegend=false
-    )
-    scatter(
-        name = "Mean count Parasite ",
-        x=x,
-        y=mean_count_parasite,
-        line=attr(color="rgb(235,52,225)"),
-        mode="lines"
-    )
-    scatter(
-        name = "Std count Parasite",
-        x=vcat(x, reverse(x)), # 
-        y=vcat(y_upper_parasite, reverse(y_lower_parasite)),        
-        fill="toself",
-        fillcolor="rgba(235,52,225,0.2)",
-        line=attr(color="rgba(235,52,225,0)"),
         hoverinfo="skip",
         showlegend=false
     )
