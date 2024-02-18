@@ -1,0 +1,18 @@
+ERROR: LoadError: UndefVarError: Pkg not defined
+Stacktrace:
+ [1] top-level scope
+   @ ~/Marvin/HostParasite/CopepodParasite2D.jl:44
+in expression starting at /home/j/janayaro/Marvin/HostParasite/CopepodParasite2D.jl:44
+################################# JOB REPORT ##################################
+Job ID: 18282678
+Cluster: palma2
+User/Group: janayaro/u0mitarb
+State: FAILED (exit code 1)
+Nodes: 1
+Cores per node: 4
+CPU Utilized: 00:00:04
+CPU Efficiency: 7.14% of 00:00:56 core-walltime
+Job Wall-clock time: 00:00:14
+Memory Utilized: 0.00 MB (estimated maximum)
+Memory Efficiency: 0.00% of 9.77 GB (2.44 GB/core)
+###############################################################################

@@ -1,0 +1,23 @@
+ERROR: LoadError: ArgumentError: Package Agents not found in current path.
+- Run `import Pkg; Pkg.add("Agents")` to install the Agents package.
+Stacktrace:
+ [1] macro expansion
+   @ ./loading.jl:1163 [inlined]
+ [2] macro expansion
+   @ ./lock.jl:223 [inlined]
+ [3] require(into::Module, mod::Symbol)
+   @ Base ./loading.jl:1144
+in expression starting at /home/j/janayaro/Marvin/HostParasite/CopepodParasite2D.jl:47
+################################# JOB REPORT ##################################
+Job ID: 18282195
+Cluster: palma2
+User/Group: janayaro/u0mitarb
+State: FAILED (exit code 1)
+Nodes: 1
+Cores per node: 4
+CPU Utilized: 00:00:04
+CPU Efficiency: 5.26% of 00:01:16 core-walltime
+Job Wall-clock time: 00:00:19
+Memory Utilized: 0.00 MB (estimated maximum)
+Memory Efficiency: 0.00% of 9.77 GB (2.44 GB/core)
+###############################################################################

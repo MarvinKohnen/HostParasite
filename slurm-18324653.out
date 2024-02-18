@@ -1,0 +1,39 @@
+ERROR: SystemError: opening file "/home/j/janayaro/Projects_JM/HostParasite/CopepodParasite2D.jl": No such file or directory
+Stacktrace:
+  [1] systemerror(p::String, errno::Int32; extrainfo::Nothing)
+    @ Base ./error.jl:176
+  [2] #systemerror#80
+    @ ./error.jl:175 [inlined]
+  [3] systemerror
+    @ ./error.jl:175 [inlined]
+  [4] open(fname::String; lock::Bool, read::Nothing, write::Nothing, create::Nothing, truncate::Nothing, append::Nothing)
+    @ Base ./iostream.jl:293
+  [5] open
+    @ ./iostream.jl:275 [inlined]
+  [6] open(f::Base.var"#387#388"{String}, args::String; kwargs::Base.Pairs{Symbol, Union{}, Tuple{}, NamedTuple{(), Tuple{}}})
+    @ Base ./io.jl:382
+  [7] open
+    @ ./io.jl:381 [inlined]
+  [8] read
+    @ ./io.jl:462 [inlined]
+  [9] _include(mapexpr::Function, mod::Module, _path::String)
+    @ Base ./loading.jl:1484
+ [10] include(mod::Module, _path::String)
+    @ Base ./Base.jl:419
+ [11] exec_options(opts::Base.JLOptions)
+    @ Base ./client.jl:303
+ [12] _start()
+    @ Base ./client.jl:522
+################################# JOB REPORT ##################################
+Job ID: 18324653
+Cluster: palma2
+User/Group: janayaro/u0mitarb
+State: FAILED (exit code 1)
+Nodes: 1
+Cores per node: 4
+CPU Utilized: 00:00:04
+CPU Efficiency: 4.00% of 00:01:40 core-walltime
+Job Wall-clock time: 00:00:25
+Memory Utilized: 0.00 MB (estimated maximum)
+Memory Efficiency: 0.00% of 9.77 GB (2.44 GB/core)
+###############################################################################
